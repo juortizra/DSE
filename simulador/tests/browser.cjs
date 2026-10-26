@@ -28,6 +28,7 @@ const assert = require("node:assert/strict");
   });
   for (let l = 0; l < 3; l++) {
     await page.goto(process.env.DSE_TEST_URL || "http://localhost:8000/");
+    await page.locator("#play").click();
     await page.locator(`[data-level="${l}"]`).click();
     await page.locator("#launch").click();
     await page.evaluate(() => testDSE.capture());

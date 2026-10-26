@@ -12,15 +12,15 @@ No hay gafas conectadas al entorno de desarrollo. Implementación WebXR, NO cert
 - [ ] Iniciar una misión y pulsar Entrar en VR: monitor de aproximadamente 1,2 m a 1,5 m, fijo respecto al espacio del operador.
 - [ ] Mover la cabeza: NO cambia la orientación ni la foto del dron.
 - [ ] Izquierdo arriba/abajo: altura; izquierda/derecha: giro. Derecho: desplazamiento. Gatillo: foto.
-- [ ] A/X: retorno automático por ruta libre y aterrizaje. B/Y: FPV/inmersiva. Si no encuentra ruta, mensaje y control manual.
-- [ ] Foto durante XR: no corrompe sesión; imagen 1280×720, lecturas sincronizadas. Volver a FPV.
+- [ ] A/X: retorno automático por ruta libre y aterrizaje; en tierra inserta SD o acepta la sugerencia calculada. Para discrepar con razón, salir a pantalla. B/Y: FPV/inmersiva. Si no encuentra ruta, mensaje y control manual.
+- [ ] Foto durante XR: no corrompe sesión; imagen 1280×720, lecturas sincronizadas. Volver a FPV. Luz se enciende al entrar en XR; hay HUD con rango, batería y checkpoint. La foto aceptada avanza automáticamente al siguiente punto.
 - [ ] En Controles, activar vista inmersiva opcional: velocidad reducida, transición oscura, viñeta al girar y cámara suavizada. Probar sentado. No continuar si resulta incómodo.
 - [ ] Choque en inmersiva: negro, SD preservada, informe disponible. Se recomienda salir y volver a FPV.
 - [ ] Gafas sin foco: vuelo pausado. Mandos apagados tras haber estado conectados: pausa, no movimiento residual. Reconectar y comprobar recuperación.
 
 ## MR
 - [ ] Entrar en MR: passthrough del sistema, sin acceder a imágenes de cámara real.
-- [ ] Maqueta inicial 1:60 delante del usuario. Sin hit-test: posición aproximadamente 0,8 m bajo los ojos (mesa estimada a 0,8 m sobre el suelo para operador sentado/altura de ojos de referencia 1,6 m; ajustar).
+- [ ] Maqueta inicial 1:60 delante del usuario. Sin hit-test pero con referencia de suelo: altura 0,8 m. Si tampoco hay referencia de suelo: posición aproximadamente 0,8 m bajo los ojos (mesa estimada a 0,8 m sobre el suelo para operador sentado/altura de ojos de referencia 1,6 m; ajustar).
 - [ ] Apuntar a mesa real con el visor; B/Y coloca usando hit-test. Sin soporte, mover con agarre.
 - [ ] Agarre cerca de maqueta: mover. Ambos agarres: escalar (1:150 a 1:20). No introducir desplazamientos bruscos del operador.
 - [ ] Miniatura del dron se mueve con el vuelo, pantalla FPV visible, unidad de tierra sobre la mesa.

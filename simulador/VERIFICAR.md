@@ -26,3 +26,6 @@ Con la óptica indicada, escalas a 300/500/1000 mm: **0,40748 / 0,67913 / 1,3582
 
 ## Política provisional ante fisuras no resolubles
 [VERIFICAR] La nueva política separa cobertura y precisión: una cota óptica conservadora puede apoyar el triage sin dar un ancho exacto. Confianza relativa por punto no medido: factor 0,7 configurable. Una cota que alcance el umbral de 1 mm eleva a amarillo por precaución; no se usa para inventar daño severo extendido. Esta inferencia depende del modelo sintético de detección y no garantiza que una IA real carezca de falsos negativos. Validar con el evaluador responsable antes de cualquier uso fuera de la simulación.
+
+## Nivel 3: profesor, Quest y entorno
+[VERIFICAR] QA-QUEST.md completo en hardware real; FPS, comodidad y tamaños; identificación de botones según firmware; eventos de agarre con manos sin mandos; hit-test y fallback local; visibilidad/sesiones repetidas; permisos en modo avión; persistencia de caché y confianza de CA en red local. El entorno de desarrollo no tiene gafas. No se usan anclas persistentes ni acceso a cámara real. Autonomía de batería de tierra no modelada. Nombre completo del autor y referencia histórica de la fecha del sismo pendientes; la fecha se etiqueta como contexto didáctico.

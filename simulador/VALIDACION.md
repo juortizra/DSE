@@ -41,3 +41,23 @@
 - 43 pruebas unitarias: incluye cobertura completa sin anchos, colapso/inclinación/amenazas con limitaciones, límites de cota, lecturas ausentes, baja calidad y repetición mejorada sin bloqueo por fotos anteriores.
 - `npm run test:evidence`, Chromium con ruido aleatorio activo: 7 fotos buenas a 0,8 m en cada edificio → amarillo por precaución / amarillo / rojo; 7 fotos a 0,2 m en vivienda → verde provisional por cotas suficientes; decisiones habilitadas y acceso al informe. Sin fotos → INDETERMINADO y segunda salida. Cero errores de consola observados.
 - El arnés sitúa el dron frente a los puntos y acelera la cola de procesamiento; no es un recorrido pilotado manualmente.
+
+## Nivel 3A–3D (26 octubre de 2026)
+
+### Comprobado en Chromium local
+- 45 pruebas unitarias: reglas, sensores, óptica, exportación, preferencias inválidas y rutas A* sin atravesar las cajas del vuelo.
+- `test:level3`: inicio docente, Acerca/ODS, controles, interrupción de demo, tamaño/volumen persistentes, vuelo con WebXR no disponible; ninguna petición externa ni error/advertencia de consola observado en este recorrido.
+- Caché completa: se corta la red del contexto del navegador y se recargan `/conectar/`, `/conectar` (redirección local), QR y juego con query; despegue offline correcto.
+- `test:demo`: red cortada después de cachear, demostración completa en **142 segundos** con siete fotos, regreso, análisis y decisión/informe automáticos. No acredita progreso como jugador. Pestaña visible, viewport 900×650 y ajuste de rendimiento activado, render por software; no es un benchmark de Quest.
+- Rechazo XR simulado: tres intentos, cada vez con menos opcionales, conservando vuelo normal.
+- Ciclo XR con sesión y renderer simulados: ambos modos, sticks, pérdida de foco, restauración de estado XR/render target incluso tras excepción y limpieza de recursos/cámara del sensor intacta. **No prueba render estereoscópico real.**
+- Regresión `test:evidence`: siete fotos buenas a 0,8 m en los tres escenarios y vivienda a 0,2 m; clasificación conservadora y datos faltantes correctos.
+- Regresión `test:project2`: tres escenarios, prevuelo, siete fotos 1280×720 sincronizadas, TFT, sugerencia, decisión e informe; indeterminado, segunda salida, réplica y descenso por batería.
+- Corregida advertencia de Three r186: PCFSoftShadowMap eliminado, se usa PCFShadowMap. Corregidas rutas de directorio en la caché offline.
+
+### Publicación y límites de verificación
+3A, 3B y 3C desplegados por separado mediante Actions; 3D se publica al cierre. Se consultó la página pública `/conectar/` mediante herramienta web y respondió con la guía y URL correctas. El navegador automatizado de este entorno no puede abrir GitHub Pages: `net::ERR_CONNECTION_CLOSED`. Por ello **no se declara probada desde el dominio público la interacción, demo ni desconexión**, aunque sí se probaron sobre los archivos locales de publicación. Revisar en el equipo del profesor y Quest.
+
+Sin Quest, cable USB/ADB, red del salón ni CA instalada en las gafas: no se prueban comodidad, FPS, passthrough, superficies, agarre/escala, seguimiento de manos ni permisos XR en avión. Completar [QA-QUEST.md](QA-QUEST.md). La batería de tierra solo representa la propuesta del sistema, sin autonomía física simulada.
+
+Respaldo previo: commit de preservación y etiqueta **local** `respaldo-nivel-1-20261026` en `8ba9e42`. No se creó la rama `respaldo-nivel-1` por restricción de la sesión. Se mantuvo `arena/c1eed267-dse`, integrando el historial remoto sin reescribirlo y sin force push.

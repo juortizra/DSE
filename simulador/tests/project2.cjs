@@ -35,6 +35,7 @@ const { chromium } = require("playwright"),
     .split(",")
     .map(Number)) {
     await page.goto(url);
+    await page.locator("#play").click();
     await page.locator('[data-level="' + level + '"]').click();
     await page.locator("#launch").click();
     await page.locator("#checkBattery").check();

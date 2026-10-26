@@ -1,3 +1,52 @@
+# DSE — guía rápida de evaluación (nivel 3)
+
+**Juego:** https://juortizra.github.io/DSE/  
+**Conexión y QR:** https://juortizra.github.io/DSE/conectar/  
+**Autor:** juortizra (nombre público del repositorio; nombre completo [VERIFICAR]).  
+**Código:** https://github.com/juortizra/DSE
+
+## Evaluarlo en tres minutos
+1. Abrir en Chrome o Edge de computador y pulsar **Ver demostración**. Inspecciona apartamentos, captura los siete puntos, regresa, analiza y acepta automáticamente la sugerencia **calculada**, sin consultar el color esperado. Busca rutas con A* usando las cajas de colisión. Objetivo 2–3 minutos con pestaña visible; en equipos lentos puede tardar más. «Tomar el control» interrumpe el recorrido conservando las fotos.
+2. **Acerca del proyecto** explica componentes, ODS y límites. No requiere iniciar sesión.
+3. **Jugar** abre tres misiones. El mejor puntaje y completados se guardan localmente tras decidir con cobertura completa; la demostración automática no acredita progreso.
+4. **Controles**, siempre arriba, permite texto 100–160%, volumen/mute, subtítulos, reducción de movimiento y rendimiento sin sombras. Las clasificaciones llevan texto y formas: círculo con visto / triángulo / octágono, no solo color.
+
+## Qué representa cada parte
+| Sistema propuesto | Simulación / implementación |
+|---|---|
+| Dron y módulo autónomo con batería | Vuelo, cámara renderizada, IMU y láser con error y limitaciones; batería de vuelo simulada |
+| SD | Fotos y lecturas con un mismo instante; no hay envío ni IA durante el vuelo |
+| Unidad de tierra con batería | Cola local y TFT; batería de tierra propuesta, sin modelo de autonomía eléctrica |
+| IA liviana | Detector **sintético**, no red entrenada ni benchmark de Raspberry Pi |
+| Agente | Reglas ejecutadas sobre datos simulados, umbrales e incertidumbre, razones explicables |
+| Decisión | Recomendación provisional + elección del jugador e informe; autoridad oficial: evaluador certificado |
+
+ODS 11 principal, 9, 3 y 10: resiliencia, instrumentación, reducir exposición y acceso educativo sin red. El terremoto del **10 de agosto de 2026 en Colombia** se usa como contexto del ejercicio solicitado; fecha/evento histórico no verificados, no se afirma como noticia real.
+
+## Controles de computador
+W/S avance; A/D lateral; Q/E altura; ratón/flechas orientación; Shift precisión; F foto; T luz; G SD solo en tierra; B **guía manual** a base; L aterrizar; P pausa; Esc libera ratón. Espacio físico/joystick no requerido. Al abrir Controles se pausa el vuelo.
+
+## Gafas
+En una misión aparecen VR/MR solo tras comprobar soporte. Predeterminado: monitor FPV estable; la cabeza no altera cámara ni sensores del dron. Inmersiva opcional, velocidad reducida, viñeta y transición oscura; modo sentado recomendado, no hay locomoción física forzada. MR inicia 1:60; hit-test opcional para mesa, agarres mueven y escalan; SD se inserta tras aterrizar con gesto o respaldo. Mandos: izquierdo altura/giro; derecho desplazamiento; gatillo foto; A/X retorno y aterrizaje, luego insertar SD o aceptar sugerencia; B/Y alterna vista VR o coloca MR en el plano detectado. Para discrepar del agente con razón, salir de XR y usar el informe completo. Seguimiento de manos depende de eventos select/squeeze del navegador y no tiene reconocedor propio.
+
+**No se ha probado en hardware Quest.** Comprobar comodidad, controladores, hit-test, gestos, vuelta de sesión y modo avión con [QA-QUEST.md](QA-QUEST.md). Ante permisos rechazados/fallo, el modo normal se conserva; reintento con menos funciones opcionales. No se leen imágenes de la cámara real.
+
+## Offline
+Primera carga completa con red y contexto seguro; esperar «Sin conexión listo» en /conectar. Service worker guarda módulos, Three.js, QR, guías y licencias localmente, sin CDN, fuentes remotas, telemetría ni servicios de IA. Reabrir la misma URL/navegador; caché sujeta a borrado/desalojo y modo privado. Puede aparecer «Actualizar» para activar una versión nueva. Si se borran los datos hace falta recargar con red. Que la aplicación esté en caché no garantiza permisos/passthrough WebXR offline: probarlos en las gafas.
+
+## Pendientes [VERIFICAR]
+- Quest Browser/OS, controladores, passthrough, hit-test, agarres, foco, pérdida de mandos, comodidad y FPS reales; anclas se solicitan solo opcionalmente y no hay persistencia de colocación.
+- Posición fallback MR usa referencia local: 0,8 m bajo altura inicial de los ojos; equivale aproximadamente a mesa de 0,8 m si ojos a 1,6 m. Ajustar con agarre.
+- QR/LAN/ADB y confianza TLS en la administración concreta de las gafas.
+- Nombre completo del autor y referencia del sismo del ejercicio.
+- Baterías y autonomía física de módulo/unidad de tierra, cámara, sensores, modelo IA real y política de cotas ópticas: [VERIFICAR.md](VERIFICAR.md).
+- No se mide el consumo eléctrico de la unidad de tierra ni se certifica habitabilidad.
+
+[Créditos/licencias](CREDITOS.md) · [Pruebas](VALIDACION.md).
+
+---
+## Documentación técnica e histórica del simulador
+
 # DSE · Módulo autónomo y unidad de tierra (2A–2G)
 
 **Jugar:** https://juortizra.github.io/DSE/ — sin cuenta, instalación ni servicios externos.

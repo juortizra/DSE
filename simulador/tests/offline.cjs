@@ -22,6 +22,7 @@ const { chromium } = require("playwright"),
   await p.reload();
   await p.context().setOffline(true);
   await p.reload();
+  await p.locator("#play").click();
   await p.locator('[data-level="0"]').click();
   await p.locator("#launch").click();
   await p.locator("#checkBattery").check();
