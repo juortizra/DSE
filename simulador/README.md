@@ -38,3 +38,22 @@ La verdad de terreno solo se muestra al abrir el informe final/parcial. El ZIP c
 Después de una carga completa se puede usar offline. Para actualizar una caché antigua, cierra todas las pestañas DSE o usa el aviso de actualización. La cabecera dice **2G**. WebXR conserva inspección visual experimental; no se probó en Quest y el flujo completo se hace en escritorio.
 
 Consulta [VALIDACION.md](VALIDACION.md) y [VERIFICAR.md](VERIFICAR.md). Desarrollo: `npm ci`, instalar Chromium de Playwright, servir por HTTP; `npm test`, `npm run test:project2`, `npm run test:offline`. No se necesitan comandos para jugar.
+
+## Nivel 3 — conectar Quest y preparar un salón sin internet
+
+Página del juego: https://juortizra.github.io/DSE/ · Conexión: https://juortizra.github.io/DSE/conectar/
+
+A: abrir URL pública una vez en Quest Browser, esperar caché completa y verificar modo avión. B: servidor HTTP en computador, `adb reverse tcp:8000 tcp:8000`, abrir `http://localhost:8000` desde Quest autorizada por USB. El QR se genera localmente y solo contiene la URL, no empareja dispositivos.
+
+### C: servidor LAN HTTPS
+Preparar herramientas y certificado **antes** de ir al salón. No hay dependencias de ejecución externas. En el computador instalar Python 3 y mkcert mediante los canales oficiales; ejecutar (sustituir `192.168.1.50` por su IP LAN):
+
+```sh
+mkcert -install
+mkcert -cert-file aula.pem -key-file aula-key.pem 192.168.1.50 localhost 127.0.0.1
+python simulador/serve-https.py --cert aula.pem --key aula-key.pem --port 8443
+```
+
+Conectar computador y gafas al mismo Wi-Fi sin aislamiento; permitir TCP 8443 en el firewall local. Abrir `https://192.168.1.50:8443/conectar/`. Las gafas deben confiar en la CA pública de mkcert (`mkcert -CAROOT` → rootCA.pem), instalada por un mecanismo compatible con su administración. **Nunca distribuir rootCA-key.pem ni la clave del servidor**. Verificar candado/contexto seguro en las gafas, no eludir advertencias TLS. Si la CA no se puede instalar, esta opción NO está preparada: usar A o B. El certificado debe incluir la IP real; los cambios de IP requieren regenerarlo. No exponer este servidor didáctico a internet. No guardar certificados ni claves en Git.
+
+La red local puede no tener internet; la primera carga proviene del computador. Luego el service worker guarda módulos, Three.js, guía y QR local. La caché depende del navegador/almacenamiento y no garantiza permisos WebXR offline: probar con QA-QUEST.md.
