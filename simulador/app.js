@@ -1,3 +1,4 @@
+import {createXR} from "./xr.js";
 import {planRoute} from "./navigation.js";
 import { zipStore, sessionFiles } from "./export.js";
 import { scoreSession } from "./scoring.js";
@@ -292,7 +293,7 @@ $("#menuBtn").onclick = () => {
     !confirm("¿Abandonar la misión? Se perderán las fotos de esta sesión.")
   )
     return;
-  renderer.xr.getSession()?.end();
+  // XR permanece activo para recuperar e insertar SD y observar el TFT.
   menu();
 };
 canvas.onclick = () => {
@@ -351,7 +352,7 @@ onblur = () => {
   if (active && !paused && !xrMode) pause();
 };
 function cam() {
-  return renderer.xr.isPresenting ? renderer.xr.getCamera() : camera;
+  return camera; // La cabeza del operador nunca altera el sensor del dron.
 }
 let sensorCache = null,
   lastSensorMs = -Infinity;
@@ -496,7 +497,7 @@ function quality(exposureLaser = null) {
   };
 }
 function orient(dt) {
-  yaw += ((keys.ArrowLeft ? 1 : 0) - (keys.ArrowRight ? 1 : 0)) * dt;
+  yaw += (((keys.ArrowLeft ? 1 : 0) - (keys.ArrowRight ? 1 : 0))+(xrInput.yaw||0)*.6) * dt;
   pitch = T.MathUtils.clamp(
     pitch + ((keys.ArrowUp ? 1 : 0) - (keys.ArrowDown ? 1 : 0)) * dt * 0.6,
     -0.6,
@@ -526,13 +527,13 @@ function move(dt) {
   }
   orient(dt);
   const v = new T.Vector3(
-    (keys.KeyD ? 1 : 0) - (keys.KeyA ? 1 : 0),
-    (keys.KeyE ? 1 : 0) - (keys.KeyQ ? 1 : 0),
-    (keys.KeyS ? 1 : 0) - (keys.KeyW ? 1 : 0),
+    (keys.KeyD ? 1 : 0) - (keys.KeyA ? 1 : 0)+(xrInput.x||0),
+    (keys.KeyE ? 1 : 0) - (keys.KeyQ ? 1 : 0)+(xrInput.alt||0),
+    (keys.KeyS ? 1 : 0) - (keys.KeyW ? 1 : 0)+(xrInput.z||0),
   );
   if (v.length() > 1) v.normalize();
   v.applyAxisAngle(up, yaw).multiplyScalar(
-    C.flight.maxSpeed *
+    (xrMode?(xrInput.slow ? .8 : 1.5):C.flight.maxSpeed) *
       (keys.ShiftLeft || keys.ShiftRight ? C.flight.precisionFactor : 1),
   );
   v.x += Math.sin(flightSeconds) * difficulty().windMps;
@@ -752,7 +753,7 @@ function snapshot() {
   return degradePhoto(out);
 }
 async function capture() {
-  if (!active || paused || xrMode) return;
+  if (!active || paused) return;
   if (photos.filter((p) => p.sortie === sortie).length >= C.sd.capacity) {
     toast("SD llena: regresa a base.");
     return;
@@ -920,10 +921,10 @@ function finish(reason) {
   flightToken++;
   capturing = false;
   finishReason = reason;
-  renderer.xr.getSession()?.end();
+  // XR permanece activo para recuperar e insertar SD y observar el TFT.
   document.exitPointerLock?.();
   $("#hud").hidden = true;
-  analyze();
+  if(xrMode==='immersive-ar'){awaitingSD=true;$('#insertSD').hidden=false;toast('SD recuperada: agarra la tarjeta y acércala a la unidad, o pulsa Insertar SD.');}else analyze();
 }
 async function analyze() {
   const token = ++processingToken;
@@ -1061,99 +1062,15 @@ $("#capture").onclick = capture;
 $("#land").onclick = land;
 $("#returnBtn").onclick = returnToBase;
 $("#pauseBtn").onclick = pause;
-// XR opcional: MR preserva el vuelo y ofrece inspección de maqueta. Sin XR se mantiene el juego normal.
-let hitSource = null,
-  hitPose = null,
-  xrSaved = null;
-const reticle = new T.Mesh(
-  new T.RingGeometry(0.07, 0.09, 32),
-  new T.MeshBasicMaterial({ color: 0xc4f37a, side: T.DoubleSide }),
-);
-reticle.rotation.x = -Math.PI / 2;
-reticle.visible = false;
-scene.add(reticle);
-async function enterXR() {
-  if (!navigator.xr) {
-    toast("WebXR no disponible. El juego normal sigue funcionando.");
-    return;
-  }
-  try {
-    const mode = (await navigator.xr.isSessionSupported("immersive-ar"))
-      ? "immersive-ar"
-      : "immersive-vr";
-    if (!(await navigator.xr.isSessionSupported(mode))) {
-      toast("No hay un modo XR compatible.");
-      return;
-    }
-    const session = await navigator.xr.requestSession(mode, {
-      optionalFeatures: ["local-floor", "hit-test"],
-    });
-    document.exitPointerLock?.();
-    xrSaved = { position: rig.position.clone(), paused };
-    paused = true;
-    xrMode = mode;
-    renderer.xr.setReferenceSpaceType("local");
-    await renderer.xr.setSession(session);
-    if (mode === "immersive-ar") {
-      scene.background = null;
-      scene.fog = null;
-      world.scale.setScalar(0.045);
-      world.position.set(0, -0.5, -1);
-      rig.position.set(0, 0, 0);
-      rig.rotation.set(0, 0, 0);
-      camera.rotation.set(0, 0, 0);
-      if (session.requestHitTestSource) {
-        try {
-          hitSource = await session.requestHitTestSource({
-            space: await session.requestReferenceSpace("viewer"),
-          });
-        } catch {
-          toast("Sin detección de mesa: maqueta colocada delante de ti.");
-        }
-      }
-    }
-    session.addEventListener("select", () => {
-      if (hitPose && mode === "immersive-ar") world.position.copy(hitPose);
-    });
-    session.addEventListener("end", () => {
-      hitSource?.cancel();
-      hitSource = null;
-      hitPose = null;
-      reticle.visible = false;
-      world.scale.setScalar(1);
-      world.position.set(0, 0, 0);
-      rig.position.copy(xrSaved.position);
-      paused = xrSaved.paused;
-      xrMode = null;
-      scene.background = new T.Color(environment.sky);
-      scene.fog = new T.Fog(environment.sky, 40, 120);
-      orient(0.1);
-      clearKeys();
-      toast("XR finalizado. Continúa tu misión en pantalla.");
-    });
-  } catch (e) {
-    xrMode = null;
-    paused = false;
-    toast("No se pudo iniciar XR: " + e.message);
-  }
-}
-$("#xr").onclick = enterXR;
-function xrFrame(frame) {
-  if (!hitSource || !frame) return;
-  const result = frame.getHitTestResults(hitSource)[0];
-  if (result) {
-    const pose = result.getPose(renderer.xr.getReferenceSpace());
-    if (pose) {
-      hitPose = new T.Vector3(
-        pose.transform.position.x,
-        pose.transform.position.y,
-        pose.transform.position.z,
-      );
-      reticle.position.copy(hitPose);
-      reticle.visible = true;
-    }
-  }
-}
+let xrInput={},xrHome=[],awaitingSD=false,xrFocusPaused=false;
+const xr=createXR(T,renderer,scene,camera,{
+ world:()=>world,position:()=>rig.position,mode:m=>{xrMode=m;},input:v=>{xrInput=v;},clear:clearKeys,message:toast,photo:capture,
+ focus:visible=>{if(!visible){xrFocusPaused=paused;paused=true;velocity.set(0,0,0);}else paused=xrFocusPaused;},
+ home:()=>{try{xrHome=planRoute(T,rig.position,environment.base.clone().setY(.5),bounds,environment.height+5);toast('Regreso automático por ruta libre.');}catch(e){toast(e.message);}},
+ crashed:()=>stats.crashes>0,awaitingSD:()=>awaitingSD,insert:()=>{if(!awaitingSD){toast('Primero aterriza en H para recuperar la SD.');return;}awaitingSD=false;$('#insertSD').hidden=true;analyze();}
+});
+$('#xr').onclick=()=>xr.enter('immersive-vr');$('#mr').onclick=()=>xr.enter('immersive-ar');$('#exitXR').onclick=()=>xr.exit();$('#insertSD').onclick=()=>{if(awaitingSD){awaitingSD=false;$('#insertSD').hidden=true;analyze();}};
+$('#immersiveView').onchange=e=>xr.setImmersive(e.target.checked);xr.supported();
 let demoRunning=false, demoStage="", demoRoute=[], demoIndex=0, demoWait=0, demoBusy=false, demoElapsed=0;
 function progressText(i){try{const p=JSON.parse(localStorage.getItem('dse-progress')||'{}')[i];return p?`${p.completed?'✓ Completado':'En progreso'} · mejor ${p.best}/100`:'Sin completar';}catch{return 'Progreso local no disponible';}}
 function saveProgress(i,score,completed){if(demoRunning)return;try{const p=JSON.parse(localStorage.getItem('dse-progress')||'{}');p[i]={best:Math.max(score,p[i]?.best||0),completed:completed||p[i]?.completed||false};localStorage.setItem('dse-progress',JSON.stringify(p));}catch{toast('No se pudo guardar el progreso local.');}}
@@ -1185,7 +1102,7 @@ renderer.setAnimationLoop((t, frame) => {
   const dt = Math.min((t - last) / 1000 || 0, C.flight.dtMax);
   last = t;
   if (active && !paused) {
-    if(demoRunning) demoFrame(dt); else move(dt);
+    if(demoRunning) demoFrame(dt); else if(xrHome.length){const d=xrHome[0].clone().sub(rig.position);rig.position.addScaledVector(d.clone().normalize(),Math.min(d.length(),dt));velocity.copy(d).normalize();tickSensors(dt);flightSeconds+=dt;battery=Math.max(0,battery-batteryDrain(dt,1,lightOn,1));if(d.length()<.02)xrHome.shift();if(!xrHome.length){velocity.set(0,0,0);land();}} else move(dt);
     extras(dt);
     hudClock += dt;
     if (hudClock > 0.12) {
@@ -1201,8 +1118,7 @@ renderer.setAnimationLoop((t, frame) => {
     humGain.gain.value = active && !paused ? C.audio.gain : 0;
     hum.frequency.value = C.audio.humHz + velocity.length() * C.audio.speedHz;
   }
-  xrFrame(frame);
-  renderer.render(scene, camera);
+  if(!xr.frame(dt,frame)) renderer.render(scene, camera);
 });
 onresize = () => {
   camera.aspect = innerWidth / innerHeight;
