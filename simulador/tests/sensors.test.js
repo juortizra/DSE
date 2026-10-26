@@ -1,6 +1,58 @@
-import {test} from 'node:test';import assert from 'node:assert/strict';import {samplePacket,laserReading,batteryDrain} from '../sensors.js';import {CONFIG as C} from '../config.js';
-const hit=(d,extra={})=>({distanceMm:d,reflectance:.4,...extra});
-test('El cono devuelve el objeto más cercano, no la distancia al checkpoint',()=>{assert.equal(laserReading([hit(800),hit(300)],{random:()=>.5}).mm,300);});
-test('Rango, vidrio, reflectancia y sol',()=>{for(const h of [hit(49),hit(1201),hit(300,{glass:true}),hit(300,{reflectance:0}),hit(300,{reflectance:1})])assert.equal(laserReading([h]).valid,false);assert.equal(laserReading([hit(300)],{sun:true,random:()=>0}).valid,false);});
-test('Una foto tiene un solo instante en todos sus sensores',()=>{const p=samplePacket({timeMs:123456,elapsedSeconds:60,calibrated:true,pitchDeg:1,rollDeg:2,yawDeg:3,battery:80,hits:[hit(500)],random:()=>.5});for(const v of [p,p.laser,p.imu,p.battery])assert.equal(v.timeMs,123456);assert.equal(p.imu.yawDeg,3.5);assert.equal(p.laser.errorMm,18);});
-test('Deriva y consumo configurables',()=>{const p=samplePacket({timeMs:1,elapsedSeconds:60,calibrated:false,pitchDeg:0,rollDeg:0,yawDeg:0,battery:100,hits:[hit(500)],random:()=>.5});assert.equal(p.imu.yawDeg,2);assert.ok(batteryDrain(1,2,false)>batteryDrain(1,0,false));assert.equal(batteryDrain(C.battery.flightSeconds,0,false),100);});
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import { samplePacket, laserReading, batteryDrain } from "../sensors.js";
+import { CONFIG as C } from "../config.js";
+const hit = (d, extra = {}) => ({ distanceMm: d, reflectance: 0.4, ...extra });
+test("El cono devuelve el objeto más cercano, no la distancia al checkpoint", () => {
+  assert.equal(
+    laserReading([hit(800), hit(300)], { random: () => 0.5 }).mm,
+    300,
+  );
+});
+test("Rango, vidrio, reflectancia y sol", () => {
+  for (const h of [
+    hit(49),
+    hit(1201),
+    hit(300, { glass: true }),
+    hit(300, { reflectance: 0 }),
+    hit(300, { reflectance: 1 }),
+  ])
+    assert.equal(laserReading([h]).valid, false);
+  assert.equal(
+    laserReading([hit(300)], { sun: true, random: () => 0 }).valid,
+    false,
+  );
+});
+test("Una foto tiene un solo instante en todos sus sensores", () => {
+  const p = samplePacket({
+    timeMs: 123456,
+    elapsedSeconds: 60,
+    calibrated: true,
+    pitchDeg: 1,
+    rollDeg: 2,
+    yawDeg: 3,
+    battery: 80,
+    hits: [hit(500)],
+    random: () => 0.5,
+  });
+  for (const v of [p, p.laser, p.imu, p.battery])
+    assert.equal(v.timeMs, 123456);
+  assert.equal(p.imu.yawDeg, 3.5);
+  assert.equal(p.laser.errorMm, 18);
+});
+test("Deriva y consumo configurables", () => {
+  const p = samplePacket({
+    timeMs: 1,
+    elapsedSeconds: 60,
+    calibrated: false,
+    pitchDeg: 0,
+    rollDeg: 0,
+    yawDeg: 0,
+    battery: 100,
+    hits: [hit(500)],
+    random: () => 0.5,
+  });
+  assert.equal(p.imu.yawDeg, 2);
+  assert.ok(batteryDrain(1, 2, false) > batteryDrain(1, 0, false));
+  assert.equal(batteryDrain(C.battery.flightSeconds, 0, false), 100);
+});

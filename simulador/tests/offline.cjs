@@ -24,6 +24,9 @@ const { chromium } = require("playwright"),
   await p.reload();
   await p.locator('[data-level="0"]').click();
   await p.locator("#launch").click();
+  await p.locator("#checkBattery").check();
+  await p.locator("#checkSD").check();
+  await p.locator("#takeoff").click();
   await p.locator("#metrics").waitFor();
   assert.deepEqual(errors, []);
   console.log(
