@@ -9,7 +9,7 @@ No requiere cuenta, instalación ni comandos. Todo el código y Three.js se sirv
 2. Si el entorno bloquea la rama: **Settings → Environments → github-pages → Deployment branches and tags**, permite `arena/c1eed267-dse` (Selected branches and tags → Add deployment branch or tag rule).
 3. **Actions → Publicar simulador → Run workflow → Branch: arena/c1eed267-dse → Run workflow**. Espera el resultado verde y abre la URL anterior. Si los workflows de esta rama no aparecen, abre el último run fallido y usa **Re-run all jobs**.
 
-La integración pudo subir commits, pero recibió HTTP 403 al activar Pages. Por eso la URL es prevista, no una publicación comprobada.
+Estado al entregar: Pages ya aparece habilitado, pero el entorno `github-pages` solo autoriza la rama `main`. El despliegue desde `arena/c1eed267-dse` fue bloqueado. La integración recibió HTTP 403 al intentar añadir esa rama. Completa el paso 2 y vuelve a ejecutar el workflow. La URL todavía no tiene una publicación comprobada. El workflow también admite `main` si posteriormente integras estos cambios allí.
 
 ## Controles
 Elige misión. Clic en la escena captura el ratón; Esc lo libera. WASD mueve horizontalmente; Q baja, E sube; ratón o flechas orientan. F fotografía; L aterriza. También hay botones visibles. Sin controles táctiles ni gamepad de escritorio.

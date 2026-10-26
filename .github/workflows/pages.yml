@@ -1,7 +1,7 @@
 name: Publicar simulador
 on:
   push:
-    branches: [arena/c1eed267-dse]
+    branches: [main, arena/c1eed267-dse]
     paths: ['simulador/**', '.github/workflows/pages.yml']
   workflow_dispatch:
 permissions:
