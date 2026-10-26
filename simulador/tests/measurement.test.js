@@ -1,0 +1,32 @@
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import { focalPixels, scaleMmPerPixel, measureCrack } from "../measurement.js";
+for (const [d, s] of [
+  [300, 0.4075],
+  [500, 0.6792],
+  [1000, 1.358],
+])
+  test(`Escala HFOV82 /1280: ${d} mm`, () =>
+    assert.ok(Math.abs(scaleMmPerPixel(d) - s) < 0.0004));
+test("Fórmula exacta con ángulo perpendicular e incertidumbre propagada", () => {
+  const m = measureCrack({
+    pixels: 4,
+    laser: { valid: true, mm: 500, errorMm: 18 },
+    angleDeg: 30,
+  });
+  assert.ok(
+    Math.abs(m.widthMm - (4 * 500 * Math.cos(Math.PI / 6)) / focalPixels()) <
+      1e-10,
+  );
+  assert.ok(m.uncertaintyMm > 0);
+  assert.equal(m.uncertaintyMm, Math.hypot(...Object.values(m.components)));
+});
+test("Límite exacto de 2 píxeles e inválidos", () => {
+  const laser = { valid: true, mm: 500, errorMm: 18 };
+  assert.equal(measureCrack({ pixels: 1.999, laser }).measurable, false);
+  assert.equal(measureCrack({ pixels: 2, laser }).measurable, true);
+  assert.equal(
+    measureCrack({ pixels: 3, laser: { valid: false } }).measurable,
+    false,
+  );
+});

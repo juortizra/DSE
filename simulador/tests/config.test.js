@@ -1,0 +1,12 @@
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import { CONFIG as C, VFOV } from "../config.js";
+test("Configuración completa de cámara, desplazamientos y control fino", () => {
+  assert.equal(C.laser.offsetFromCameraM.length, 3);
+  assert.ok(C.laser.offsetFromCameraM.every(Number.isFinite));
+  assert.ok(
+    C.camera.width > 0 && C.camera.height > 0 && VFOV > 0 && VFOV < 180,
+  );
+  assert.ok(C.flight.precisionFactor > 0 && C.flight.precisionFactor < 1);
+  assert.ok(C.quality.minDistanceM >= C.laser.minMm / 1000);
+});

@@ -1,0 +1,149 @@
+// ZIP STORE (sin compresión adicional): fotografías JPEG ya comprimidas. Sin bibliotecas remotas.
+const enc = new TextEncoder();
+export function crc32(bytes) {
+  let c = 0xffffffff;
+  for (const b of bytes) {
+    c ^= b;
+    for (let i = 0; i < 8; i++) c = (c >>> 1) ^ (c & 1 ? 0xedb88320 : 0);
+  }
+  return (c ^ 0xffffffff) >>> 0;
+}
+export function zipStore(files) {
+  const chunks = [],
+    central = [];
+  let offset = 0,
+    size = 0;
+  for (const f of files) {
+    const name = enc.encode(f.name),
+      data = typeof f.data === "string" ? enc.encode(f.data) : f.data,
+      crc = crc32(data),
+      local = new Uint8Array(30 + name.length),
+      v = new DataView(local.buffer);
+    v.setUint32(0, 0x04034b50, true);
+    v.setUint16(4, 20, true);
+    v.setUint16(6, 0x0800, true);
+    v.setUint16(12, 33, true); // 1980-01-01, fecha DOS válida
+    v.setUint32(14, crc, true);
+    v.setUint32(18, data.length, true);
+    v.setUint32(22, data.length, true);
+    v.setUint16(26, name.length, true);
+    local.set(name, 30);
+    chunks.push(local, data);
+    const c = new Uint8Array(46 + name.length),
+      w = new DataView(c.buffer);
+    w.setUint32(0, 0x02014b50, true);
+    w.setUint16(4, 20, true);
+    w.setUint16(6, 20, true);
+    w.setUint16(8, 0x0800, true);
+    w.setUint16(14, 33, true);
+    w.setUint32(16, crc, true);
+    w.setUint32(20, data.length, true);
+    w.setUint32(24, data.length, true);
+    w.setUint16(28, name.length, true);
+    w.setUint32(42, offset, true);
+    c.set(name, 46);
+    central.push(c);
+    size += c.length;
+    offset += local.length + data.length;
+  }
+  const end = new Uint8Array(22),
+    v = new DataView(end.buffer);
+  v.setUint32(0, 0x06054b50, true);
+  v.setUint16(8, files.length, true);
+  v.setUint16(10, files.length, true);
+  v.setUint32(12, size, true);
+  v.setUint32(16, offset, true);
+  const all = [...chunks, ...central, end],
+    out = new Uint8Array(offset + size + 22);
+  let i = 0;
+  for (const a of all) {
+    out.set(a, i);
+    i += a.length;
+  }
+  return out;
+}
+export function sessionFiles({ photos, truth, report, config }) {
+  const name = (p) => `fotos/foto-${String(p.id).padStart(4, "0")}.jpg`,
+    csv = (x) => `"${String(x ?? "").replaceAll('"', '""')}"`;
+  const headers = [
+    "numero",
+    "instante_iso",
+    "time_ms",
+    "imagen",
+    "salida",
+    "checkpoint",
+    "laser_mm",
+    "laser_valido",
+    "laser_error_mm",
+    "laser_motivo",
+    "laser_time_ms",
+    "cabeceo_deg",
+    "alabeo_deg",
+    "yaw_estimado_deg",
+    "angulo_muro_estimado_deg",
+    "imu_time_ms",
+    "bateria_pct",
+    "bateria_time_ms",
+    "calibrado",
+    "calidad_pct",
+    "aceptada",
+    "previa_replica",
+  ];
+  const rows = photos.map((p) => [
+    p.id,
+    new Date(p.timeMs).toISOString(),
+    p.timeMs,
+    name(p),
+    p.sortie,
+    p.point + 1,
+    p.sensors.laser.mm,
+    p.sensors.laser.valid,
+    p.sensors.laser.errorMm,
+    p.sensors.laser.reason,
+    p.sensors.laser.timeMs,
+    p.sensors.imu.pitchDeg,
+    p.sensors.imu.rollDeg,
+    p.sensors.imu.yawDeg,
+    p.sensors.imu.wallAngleDeg,
+    p.sensors.imu.timeMs,
+    p.sensors.battery.percent,
+    p.sensors.battery.timeMs,
+    p.sensors.imu.calibrated,
+    p.quality.score,
+    p.quality.accepted,
+    !!p.preReplica,
+  ]);
+  const files = photos.map((p) => ({
+    name: name(p),
+    data: Uint8Array.from(atob(p.image.split(",")[1]), (c) => c.charCodeAt(0)),
+  }));
+  files.push(
+    {
+      name: "telemetria.csv",
+      data:
+        "\ufeff" +
+        [headers, ...rows].map((r) => r.map(csv).join(",")).join("\r\n"),
+    },
+    {
+      name: "verdad-terreno.json",
+      data: JSON.stringify(
+        {
+          synthetic: true,
+          warning:
+            "Imágenes y daños SINTÉTICOS. No son un conjunto validado de edificios reales.",
+          photos: [...truth.entries()].map(([id, t]) => ({ id, ...t })),
+          scenario: report.scenario,
+        },
+        null,
+        2,
+      ),
+    },
+    { name: "informe.json", data: JSON.stringify(report, null, 2) },
+    { name: "configuracion.json", data: JSON.stringify(config, null, 2) },
+    {
+      name: "LEEME.txt",
+      data: "IMÁGENES SINTÉTICAS renderizadas, con ruido, exposición, desenfoque y JPEG simulados.\ntelemetria.csv contiene lecturas estimadas; verdad-terreno.json contiene referencias sintéticas separadas.\nNo entrenar ni validar un sistema de seguridad como si fueran datos reales.\nClasificación provisional; no sustituye al evaluador certificado ni a la Fase 2.",
+    },
+  );
+  return files;
+}

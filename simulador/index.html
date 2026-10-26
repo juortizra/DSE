@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta name="theme-color" content="#101e25" />
+    <title>DSE · Misión estructural</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <canvas id="view" aria-label="Cámara del dron"></canvas>
+    <header>
+      <b>◈ DSE <span>LABORATORIO DE CAMPO</span></b>
+      <div id="status">INSPECCIÓN POSTSISMO</div>
+      <button id="menuBtn">Misiones</button>
+    </header>
+    <div id="hud" hidden>
+      <aside>
+        <small>MÓDULO AUTÓNOMO · SD LOCAL</small>
+        <div id="metrics"></div>
+      </aside>
+      <section id="target"></section>
+      <div id="cross">⊕</div>
+      <div id="message" role="status" aria-live="polite"></div>
+      <img id="thumbnail" alt="Última foto capturada" hidden /><canvas
+        id="map"
+        width="200"
+        height="180"
+        aria-label="Mapa de navegación"
+      ></canvas>
+      <nav>
+        <button id="capture">◉ Foto [F]</button
+        ><button id="galleryBtn">SD en tierra [G]</button
+        ><button id="returnBtn">Base [B]</button
+        ><button id="land">Aterrizar [L]</button
+        ><button id="pauseBtn">Pausa [P]</button
+        ><button id="xr">Entrar en VR/MR</button>
+      </nav>
+      <div class="keys">
+        W/S avanzar/retroceder · A/D lateral · Q/E bajar/subir · ratón / ←→
+        girar · ↑↓ orientar · Shift precisión · T luz · Esc liberar ratón
+      </div>
+    </div>
+    <main id="panel"></main>
+    <dialog id="gallery">
+      <h2>SD virtual · galería de misión</h2>
+      <p>
+        Imágenes renderizadas desde la cámara al disparar. No se transmiten
+        datos.
+      </p>
+      <button id="closeGallery">Cerrar [G]</button>
+      <div id="galleryPhotos" class="photo-grid"></div>
+    </dialog>
+    <dialog id="photoViewer">
+      <button id="closePhoto">Cerrar foto</button>
+      <p id="fullCaption"></p>
+      <img id="fullPhoto" alt="Fotografía renderizada ampliada" />
+    </dialog>
+    <div id="updateNotice" hidden>
+      Nueva versión disponible. <button id="applyUpdate">Actualizar</button>
+    </div>
+    <div id="flash" aria-hidden="true"></div>
+    <footer>
+      Simulación educativa. La clasificación oficial la hace el evaluador
+      certificado.
+    </footer>
+    <script type="module" src="app.js"></script>
+  </body>
+</html>
