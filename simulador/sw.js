@@ -1,4 +1,4 @@
-const CACHE = "dse-2g-v4";
+const CACHE = "dse-laser-fix-v1";
 const FILES = [
   "./",
   "./index.html",
@@ -9,6 +9,7 @@ const FILES = [
   "./sensors.js",
   "./measurement.js",
   "./detector.js",
+  "./retake.js",
   "./agent.js",
   "./scoring.js",
   "./export.js",

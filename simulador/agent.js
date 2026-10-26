@@ -9,7 +9,12 @@ export function evaluateAgent({ required, results }) {
     const r = valid.filter((r) => r.point === id);
     if (!r.length)
       missing.push(
-        `Checkpoint ${id + 1}: falta foto de calidad ≥ ${C.quality.accepted}%.`,
+        `Checkpoint ${id + 1}: falta foto de calidad ≥ ${C.quality.accepted}%. ${
+          results
+            .filter((r) => r.point === id)
+            .at(-1)
+            ?.issues?.join(" ") || ""
+        }`,
       );
     else if (
       !r.some((r) =>
@@ -17,7 +22,7 @@ export function evaluateAgent({ required, results }) {
       )
     )
       missing.push(
-        `Checkpoint ${id + 1}: grieta no medible (láser inválido o menos de ${C.measurement.minPixels} píxeles).`,
+        `Checkpoint ${id + 1}: ${r.at(-1)?.issues?.join(" ") || "Grieta no medible: repite la toma con lectura válida y al menos " + C.measurement.minPixels + " píxeles."}`,
       );
   }
   const rules = [];

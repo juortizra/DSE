@@ -1,3 +1,4 @@
+import { measurementAdvice } from "./retake.js";
 import { CONFIG as C } from "./config.js";
 import { oraclePixels, measureCrack } from "./measurement.js";
 // Interfaz reemplazable: detect(photo, reference, sceneReference) -> Promise<DetectionResult>.
@@ -13,6 +14,15 @@ export class SimulatedDetector {
         pixels < C.measurement.minPixels ||
         (!good && this.random() < C.detector.falseNegativePoorRate);
     const detections = [];
+    const issues = [];
+    const advice = measurementAdvice(photo, pixels);
+    if (advice) issues.push(advice);
+    if (!good)
+      issues.push(
+        ...(photo.quality.reasons ?? [
+          "Foto de baja calidad: repetir estable y con luz.",
+        ]),
+      );
     if (!miss) {
       const px = Math.max(
           0,
@@ -66,6 +76,7 @@ export class SimulatedDetector {
       detections,
       observations,
       miss,
+      issues,
       model: "Simulación del modelo de IA liviano del proyecto",
     };
   }

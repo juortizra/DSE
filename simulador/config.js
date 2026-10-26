@@ -18,7 +18,7 @@ export const CONFIG = {
   },
   laser: {
     mappedReflectance: 0.45,
-    offsetFromCameraM: [0,0,0],
+    offsetFromCameraM: [0, 0, 0],
     minMm: 50,
     maxMm: 1200,
     relativeError: 0.03,
@@ -91,6 +91,12 @@ export const CONFIG = {
     markerRadiusM: 0.025,
     surfaceEpsilonM: 0.0005,
     note: "[VERIFICAR] calidad orientativa sobre un segmento de grieta, no grieta completa",
+  },
+  guidance: {
+    fineTargetMaxMm: 70,
+    recoveryFactor: 0.8,
+    rangeMarginMm: 5,
+    note: "[VERIFICAR] recomendaciones ópticas didácticas; confirmar enfoque mínimo y montaje real",
   },
   measurement: {
     minPixels: 2,

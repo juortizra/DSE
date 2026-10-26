@@ -166,7 +166,7 @@ function build(l) {
 function menu() {
   processingToken++;
   if (humGain) humGain.gain.value = 0;
-  $("#status").textContent = "INSPECCIÓN POSTSISMO · 2G";
+  $("#status").textContent = "INSPECCIÓN POSTSISMO · 2G · LÁSER CORREGIDO";
   active = false;
   paused = false;
   document.exitPointerLock?.();
@@ -419,7 +419,7 @@ function illumination(p) {
     (p.inside ? 0.18 : environment.light * 0.85) + (lightOn ? 0.65 : 0),
   );
 }
-function quality() {
+function quality(exposureLaser = null) {
   const p = point();
   if (!p)
     return {
@@ -465,7 +465,11 @@ function quality() {
   ray.set(pos, p.position.clone().sub(pos).normalize());
   const obstruction = ray.intersectObjects(colliders, false)[0];
   const visible = !obstruction || obstruction.distance >= distance - 0.12;
-  const d = laser();
+  const d = exposureLaser
+    ? exposureLaser.valid
+      ? exposureLaser.mm / 1000
+      : Infinity
+    : laser();
   return {
     ...photoQuality({
       distance,
@@ -613,11 +617,11 @@ function updateHUD() {
       d >= C.laser.minMm / 1000 &&
       d <= C.laser.maxMm / 1000;
   $("#metrics").innerHTML =
-    `<span class="${valid ? "" : "bad"}">LÁSER ${valid ? d.toFixed(2) + " m" : "FUERA DE RANGO"}</span><br>BATERÍA ${battery.toFixed(0)} %<br>MPU · YAW ${sensorCache?.imu.yawDeg.toFixed(1) ?? "—"}°${calibrated ? " CAL" : " SIN CAL"}<br>ALTURA ${rig.position.y.toFixed(1)} m<br>VELOCIDAD ${velocity.length().toFixed(2)} m/s<br>${inside ? "INTERIOR · " + (lightOn ? "LUZ ON" : "LUZ OFF [T]") : "EXTERIOR"}<br>SD ${photos.length} fotos · ${accepted()}/${points.length} puntos`;
+    `<span class="${valid ? "" : "bad"}">LÁSER ${valid ? (d * 1000).toFixed(0) + " mm" : "SIN LECTURA"}</span>${valid ? `<br>2 px ≈ ${(C.measurement.minPixels * scaleMmPerPixel(d * 1000)).toFixed(2)} mm` : `<br>${sensorCache?.laser.reason || "Apunta a un muro"}`}<br>BATERÍA ${battery.toFixed(0)} %<br>MPU · YAW ${sensorCache?.imu.yawDeg.toFixed(1) ?? "—"}°${calibrated ? " CAL" : " SIN CAL"}<br>ALTURA ${rig.position.y.toFixed(1)} m<br>VELOCIDAD ${velocity.length().toFixed(2)} m/s<br>${inside ? "INTERIOR · " + (lightOn ? "LUZ ON" : "LUZ OFF [T]") : "EXTERIOR"}<br>SD ${photos.length} fotos · ${accepted()}/${points.length} puntos`;
   const p = point(),
     q = quality();
   $("#target").innerHTML =
-    `<small>${returning ? "REGRESO A BASE" : "INSPECCIÓN · " + (p?.inside ? "INTERIOR" : "EXTERIOR")}</small><h3>${returning ? "Base / carpa de evaluación" : p?.name}</h3><p>${bearing(returning ? environment.base : p.position)} · ${rig.position.distanceTo(returning ? environment.base : p.position).toFixed(1)} m<br>${returning ? "Zona H · altura < 0,75 m · velocidad < 0,3 m/s" : `Altura objetivo ${p.position.y.toFixed(1)} m · calidad ${q.score}%<br>${q.reasons[0] || "✓ Foto lista [F]"}`}</p><div class="checkpoint-list">${points.map((p, i) => `<button data-point="${i}" class="${i === chosen ? "selected" : ""}">${i + 1}. ${p.state}${p.best ? " " + p.best.quality.score + "%" : ""}</button>`).join("")}</div>`;
+    `<small>${returning ? "REGRESO A BASE" : "INSPECCIÓN · " + (p?.inside ? "INTERIOR" : "EXTERIOR")}</small><h3>${returning ? "Base / carpa de evaluación" : p?.name}</h3><p>${bearing(returning ? environment.base : p.position)} · ${(returning ? rig.position : cam().getWorldPosition(new T.Vector3())).distanceTo(returning ? environment.base : p.position).toFixed(2)} m ${returning ? "" : "(desde cámara)"}<br>${returning ? "Zona H · altura < 0,75 m · velocidad < 0,3 m/s" : `Altura objetivo ${p.position.y.toFixed(1)} m · calidad ${q.score}%<br>${q.reasons[0] || "✓ Encuadre listo [F]. La medición se verifica en tierra."}`}${!returning ? `<br>Láser útil: ${C.laser.minMm}–${C.laser.maxMm} mm. Para capilares, aproxima la cámara a ${C.laser.minMm + C.guidance.rangeMarginMm}–${C.guidance.fineTargetMaxMm} mm con Shift. Una foto aceptada no garantiza que la grieta sea medible.` : ""}</p><div class="checkpoint-list">${points.map((p, i) => `<button data-point="${i}" class="${i === chosen ? "selected" : ""}">${i + 1}. ${p.state}${p.best ? " " + p.best.quality.score + "%" : ""}</button>`).join("")}</div>`;
   markers.forEach((m, i) => {
     m.visible = !returning && !points[i].best;
     m.material.color.set(i === chosen ? 0xc4f37a : 0x98aaa4);
@@ -762,15 +766,22 @@ async function capture() {
   }
   // Todas las lecturas y la pose se congelan EN EL INSTANTE DE EXPOSICIÓN, no al pulsar F.
   const p = point(),
-    q = quality(),
     timeMs = Date.now(),
     packet = readSensors(timeMs),
+    q = quality(packet.laser),
     id = photos.length + 1;
+  // HUD y foto quedan sincronizados con la única lectura utilizada al exponer.
+  sensorCache = packet;
+  lastSensorMs = performance.now();
   if (!packet.laser.valid) {
     q.accepted = false;
     q.score = Math.min(q.score, C.quality.accepted - 1);
-    if (!q.reasons.some((r) => r.includes("Láser")))
-      q.reasons.push("Láser inválido al exponer: " + packet.laser.reason);
+    q.reasons = q.reasons.filter((r) => !r.includes("Láser"));
+    q.reasons.unshift(
+      "Láser sin lectura al exponer: " +
+        packet.laser.reason +
+        ". Repite sobre una superficie opaca dentro del rango.",
+    );
   }
   packet.imu.wallAngleDeg = T.MathUtils.clamp(
     q.angle +
@@ -953,7 +964,7 @@ function detectedCard(p, r, i) {
         `<div class="detection" style="left:${d.box.x * 100}%;top:${d.box.y * 100}%;width:${d.box.w * 100}%;height:${d.box.h * 100}%"><span>${d.measure.measurable ? d.measure.widthMm.toFixed(2) + " ± " + d.measure.uncertaintyMm.toFixed(2) + " mm" : "No medible"}</span></div>`,
     )
     .join("");
-  return `<article><div class="detected-photo"><img src="${p.image}" alt="Captura ${p.id}: ${p.name}">${boxes}</div><h3>${p.id}. ${p.name}</h3><p>Calidad ${p.quality.score}% · ${p.quality.accepted ? "aceptada" : "rechazada"}</p><p>${r.miss ? "No se resolvió la grieta; posible falso negativo." : r.detections.map((d) => d.kind + ": " + (d.measure.reason || d.measure.widthMm.toFixed(2) + " ± " + d.measure.uncertaintyMm.toFixed(2) + " mm")).join("<br>")}</p><p>${p.quality.reasons.join("<br>")}</p></article>`;
+  return `<article><div class="detected-photo"><img src="${p.image}" alt="Captura ${p.id}: ${p.name}">${boxes}</div><h3>${p.id}. ${p.name}</h3><p>Calidad ${p.quality.score}% · ${p.quality.accepted ? "aceptada" : "rechazada"}</p><p>${r.miss ? r.issues?.join("<br>") || "No se resolvió la grieta: revisar resolución y calidad." : r.detections.map((d) => d.kind + ": " + (d.measure.reason || d.measure.widthMm.toFixed(2) + " ± " + d.measure.uncertaintyMm.toFixed(2) + " mm")).join("<br>")}</p><p>${p.quality.reasons.join("<br>")}</p></article>`;
 }
 function drawTFT(done, total, p) {
   const c = $("#tft");
