@@ -48,3 +48,30 @@ export function measureCrack({
 export function oraclePixels(truth) {
   return truth.widthMm / scaleMmPerPixel(truth.distanceMm, truth.angleDeg);
 }
+
+// Si una región de buena calidad no resuelve una traza, solo hay una COTA óptica,
+// no un ancho medido ni prueba de ausencia. Incluye margen de borde, láser y ángulo.
+export function unresolvedCrackBound({
+  laser,
+  angleDeg = 0,
+  angleErrorDeg = C.imu.attitudeErrorDeg,
+}) {
+  if (
+    !laser?.valid ||
+    !Number.isFinite(laser.mm) ||
+    laser.mm <= 0 ||
+    !Number.isFinite(angleDeg) ||
+    Math.abs(angleDeg) >= 90
+  )
+    return null;
+  const error =
+    laser.errorMm ?? laser.mm * C.laser.relativeError + C.laser.absoluteErrorMm;
+  const conservativeAngle = Math.max(
+    0,
+    Math.abs(angleDeg) - Math.abs(angleErrorDeg),
+  );
+  return (
+    (C.measurement.minPixels + C.measurement.pixelError) *
+    scaleMmPerPixel(laser.mm + error, conservativeAngle)
+  );
+}

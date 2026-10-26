@@ -4,10 +4,13 @@ export const DISCLAIMER =
   "Clasificación provisional; no sustituye al evaluador certificado ni a la Fase 2.";
 export function evaluateAgent({ required, results }) {
   const valid = results.filter((r) => r.quality >= C.quality.accepted),
-    missing = [];
+    missing = [],
+    measurementWarnings = [],
+    unresolved = [];
+  let measuredPoints = 0;
   for (const id of required) {
     const r = valid.filter((r) => r.point === id);
-    if (!r.length)
+    if (!r.length) {
       missing.push(
         `Checkpoint ${id + 1}: falta foto de calidad ≥ ${C.quality.accepted}%. ${
           results
@@ -16,13 +19,35 @@ export function evaluateAgent({ required, results }) {
             ?.issues?.join(" ") || ""
         }`,
       );
-    else if (
-      !r.some((r) =>
+      continue;
+    }
+    if (
+      r.some((r) =>
         r.detections.some((d) => !d.suspect && d.measure.measurable),
       )
-    )
+    ) {
+      measuredPoints++;
+      continue;
+    }
+    const bounded = r
+      .filter(
+        (r) =>
+          r.optical?.laserValid &&
+          Number.isFinite(r.optical.upperBoundMm) &&
+          r.optical.upperBoundMm > 0,
+      )
+      .sort((a, b) => a.optical.upperBoundMm - b.optical.upperBoundMm)[0];
+    if (bounded) {
+      unresolved.push({
+        point: id,
+        upperBoundMm: bounded.optical.upperBoundMm,
+      });
+      measurementWarnings.push(
+        `Checkpoint ${id + 1}: foto válida, ancho no medido. Cota óptica conservadora ${bounded.optical.upperBoundMm.toFixed(2)} mm (no es una medición ni certifica seguridad). ${bounded.issues?.join(" ") || ""}`,
+      );
+    } else
       missing.push(
-        `Checkpoint ${id + 1}: ${r.at(-1)?.issues?.join(" ") || "Grieta no medible: repite la toma con lectura válida y al menos " + C.measurement.minPixels + " píxeles."}`,
+        `Checkpoint ${id + 1}: falta una lectura de distancia o evidencia utilizable. ${r.at(-1)?.issues?.join(" ") || ""}`,
       );
   }
   const rules = [];
@@ -86,13 +111,19 @@ export function evaluateAgent({ required, results }) {
       1,
       "Amenaza externa (parapeto, vecino o cable): amarillo como mínimo.",
     );
+  if (unresolved.some((p) => p.upperBoundMm >= C.agent.crackYellowMm))
+    add(
+      "resolucion-precaucion",
+      1,
+      `En las fotos válidas, la resolución no permite descartar ${C.agent.crackYellowMm} mm o más en ${unresolved.filter((p) => p.upperBoundMm >= C.agent.crackYellowMm).length} punto(s): AMARILLO por precaución. No se ha inventado un ancho; las evidencias de colapso o amenaza siguen teniendo prioridad.`,
+    );
   if (!rules.length)
     add(
       missing.length ? "sin-evidencia" : "capilares",
       0,
       missing.length
         ? "Sin observaciones concluyentes: no autoriza el uso."
-        : "Solo capilares medibles por debajo de 1 mm; sin otros indicios modelados.",
+        : "Medidas o cotas ópticas conservadoras por debajo de 1 mm; sin otros indicios modelados. No equivale a certificar habitabilidad.",
     );
   const riskMinimum = Math.max(...rules.map((r) => r.level)),
     covered = required.filter((id) => valid.some((r) => r.point === id)).length,
@@ -107,7 +138,15 @@ export function evaluateAgent({ required, results }) {
     rules,
     missing,
     coverage,
-    confidence: coverage * quality,
+    confidence:
+      coverage *
+      quality *
+      (1 -
+        (required.length ? unresolved.length / required.length : 0) *
+          (1 - C.agent.unresolvedConfidenceFactor)),
+    measuredPoints,
+    measurementWarnings,
+    unresolvedPoints: unresolved,
     notEvaluable: [
       "Olor a gas y fugas",
       "Cimentaciones y daños ocultos",

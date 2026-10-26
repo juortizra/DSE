@@ -166,7 +166,7 @@ function build(l) {
 function menu() {
   processingToken++;
   if (humGain) humGain.gain.value = 0;
-  $("#status").textContent = "INSPECCIÓN POSTSISMO · 2G · LÁSER CORREGIDO";
+  $("#status").textContent = "INSPECCIÓN POSTSISMO · 2G · AGENTE CORREGIDO";
   active = false;
   paused = false;
   document.exitPointerLock?.();
@@ -1010,7 +1010,7 @@ function renderGroundSummary() {
   });
   const a = agentResult;
   $("#groundSummary").innerHTML =
-    `<h2>Sugerencia: ${a.label}</h2><p>${DISCLAIMER}</p><p>${a.referral}</p>${quakeDone ? "<p>Réplica modelada: se exige repetir la Fase 1. Las fotos previas no cubren checkpoints.</p>" : ""}<p>Confianza de cobertura/calidad ${(a.confidence * 100).toFixed(0)}% (no probabilidad de seguridad).</p><ul>${a.rules.map((r) => `<li>${LABELS[r.level]} · ${r.text}</li>`).join("")}</ul>${a.missing.length ? "<h3>Qué falta</h3><ul>" + a.missing.map((t) => "<li>" + t + "</li>").join("") + '</ul><button id="secondSortie">Segunda salida · batería nueva y conservar fotos</button>' : ""}<h3>No evaluable con este sistema</h3><ul>${a.notEvaluable.map((t) => "<li>" + t + "</li>").join("")}</ul>${a.verdict === null ? '<button id="partialReport">Ver informe parcial (INDETERMINADO)</button>' : ""}<div class="choices">${LABELS.map((v, i) => `<button data-verdict="${i}" ${a.verdict === null ? "disabled" : ""}>${v}</button>`).join("")}</div><label>Si discrepas del agente, elige una razón: <select id="disagreeReason"><option value="">Seleccionar…</option>${C.disagreementReasons.map((r, i) => `<option value="${i}">${r}</option>`).join("")}</select></label><div id="result"></div><button id="again">Volver a misiones</button>`;
+    `<h2>Sugerencia: ${a.label}</h2><p>${DISCLAIMER}</p><p>${a.referral}</p>${quakeDone ? "<p>Réplica modelada: se exige repetir la Fase 1. Las fotos previas no cubren checkpoints.</p>" : ""}<p>Cobertura fotográfica ${(a.coverage * 100).toFixed(0)}% · anchos medidos en ${a.measuredPoints}/${points.length} puntos. Las limitaciones ópticas no anulan evidencias estructurales.</p><p>Confianza de cobertura/calidad ${(a.confidence * 100).toFixed(0)}% (no probabilidad de seguridad).</p><ul>${a.rules.map((r) => `<li>${LABELS[r.level]} · ${r.text}</li>`).join("")}</ul>${a.measurementWarnings.length ? "<h3>Limitaciones de medición (no son checkpoints ausentes)</h3><ul>" + a.measurementWarnings.map((t) => "<li>" + t + "</li>").join("") + "</ul>" : ""}${a.missing.length ? "<h3>Qué falta</h3><ul>" + a.missing.map((t) => "<li>" + t + "</li>").join("") + '</ul><button id="secondSortie">Segunda salida · batería nueva y conservar fotos</button>' : ""}${!a.missing.length && a.measurementWarnings.length ? '<button id="secondSortie">Mejorar medidas · segunda salida opcional</button>' : ""}<h3>No evaluable con este sistema</h3><ul>${a.notEvaluable.map((t) => "<li>" + t + "</li>").join("")}</ul>${a.verdict === null ? '<button id="partialReport">Ver informe parcial (INDETERMINADO)</button>' : ""}<div class="choices">${LABELS.map((v, i) => `<button data-verdict="${i}" ${a.verdict === null ? "disabled" : ""}>${v}</button>`).join("")}</div><label>Si discrepas del agente, elige una razón: <select id="disagreeReason"><option value="">Seleccionar…</option>${C.disagreementReasons.map((r, i) => `<option value="${i}">${r}</option>`).join("")}</select></label><div id="result"></div><button id="again">Volver a misiones</button>`;
   $("#again").onclick = menu;
   $("#partialReport")?.addEventListener("click", () => {
     decisionRecord = {

@@ -1,6 +1,10 @@
 import { measurementAdvice } from "./retake.js";
 import { CONFIG as C } from "./config.js";
-import { oraclePixels, measureCrack } from "./measurement.js";
+import {
+  oraclePixels,
+  measureCrack,
+  unresolvedCrackBound,
+} from "./measurement.js";
 // Interfaz reemplazable: detect(photo, reference, sceneReference) -> Promise<DetectionResult>.
 // Solo este adaptador sintético recibe truth. Un adaptador de IA real no la recibiría.
 export class SimulatedDetector {
@@ -74,6 +78,16 @@ export class SimulatedDetector {
       point: photo.point,
       quality: photo.preReplica ? 0 : photo.quality.score,
       detections,
+      optical: {
+        laserValid: photo.sensors.laser.valid,
+        upperBoundMm: good
+          ? unresolvedCrackBound({
+              laser: photo.sensors.laser,
+              angleDeg: photo.sensors.imu.wallAngleDeg,
+              angleErrorDeg: photo.sensors.imu.wallAngleErrorDeg,
+            })
+          : null,
+      },
       observations,
       miss,
       issues,

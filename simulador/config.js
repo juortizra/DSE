@@ -124,7 +124,8 @@ export const CONFIG = {
     crackYellowMm: 1,
     crackSevereMm: 5,
     severeElementsRed: 3,
-    note: "[VERIFICAR] umbrales de ejemplo NO oficiales; validar con evaluador certificado",
+    unresolvedConfidenceFactor: 0.7,
+    note: "[VERIFICAR] umbrales de ejemplo NO oficiales; cota óptica no es medida. Cobertura completa con resolución insuficiente eleva a amarillo por precaución, no bloquea otras evidencias. Validar con evaluador certificado",
   },
   disagreementReasons: [
     "La evidencia fotográfica es insuficiente",

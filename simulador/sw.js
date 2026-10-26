@@ -1,4 +1,4 @@
-const CACHE = "dse-laser-fix-v1";
+const CACHE = "dse-agent-evidence-v1";
 const FILES = [
   "./",
   "./index.html",

@@ -30,7 +30,7 @@ test("Láser inválido explica el retorno real, no inventa ancho", () => {
   assert.match(s, /Vidrio/);
   assert.match(s, /50–1200/);
 });
-test("INDETERMINADO explica la resolución y conserva un sensor válido", async () => {
+test("Cobertura válida con precisión insuficiente produce precaución y no bloqueo", async () => {
   const r = await new SimulatedDetector(() => 0.5).detect(
     photo,
     { widthMm: 0.2, distanceMm: 900, angleDeg: 0 },
@@ -38,7 +38,8 @@ test("INDETERMINADO explica la resolución y conserva un sensor válido", async 
   );
   assert.ok(r.miss);
   const a = evaluateAgent({ required: [0], results: [r] });
-  assert.equal(a.label, "INDETERMINADO");
-  assert.match(a.missing[0], /Láser válido/);
-  assert.match(a.missing[0], /px/);
+  assert.equal(a.label, "AMARILLO");
+  assert.equal(a.missing.length, 0);
+  assert.match(a.measurementWarnings[0], /Láser válido/);
+  assert.match(a.measurementWarnings[0], /px/);
 });
