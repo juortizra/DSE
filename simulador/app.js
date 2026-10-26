@@ -1,3 +1,5 @@
+import {CONFIG as C,VFOV} from "./config.js";
+import {samplePacket,batteryDrain} from "./sensors.js";
 import * as T from "./vendor/three.module.js";
 import { cases, estimate, suggest } from "./rules.js";
 import { photoQuality } from "./quality.js";
@@ -29,8 +31,8 @@ sun.shadow.bias = -0.0008;
 scene.add(hemi, sun);
 const rig = new T.Group();
 scene.add(rig);
-const camera = new T.PerspectiveCamera(65, innerWidth / innerHeight, 0.04, 180);
-camera.rotation.order = "YXZ";
+const camera = new T.PerspectiveCamera(VFOV, innerWidth / innerHeight, 0.04, 180);
+camera.rotation.order = "YXZ";camera.position.z=-C.camera.offsetM;
 rig.add(camera);
 const lamp = new T.SpotLight(0xfff1cf, 0, 12, 0.7, 0.6, 1);
 lamp.position.set(0, 0, 0.05);
@@ -59,6 +61,7 @@ let world,
   returning = false,
   finishReason = "",
   xrMode = null;
+let calibrated=false,flightSeconds=0,sortie=1,flightToken=0,capturing=false,difficultyKey="normal";const truth=new Map(),batteryWarnings=new Set();const difficulty=()=>C.difficulties[difficultyKey];
 const velocity = new T.Vector3(),
   keys = {},
   ray = new T.Raycaster(),
@@ -91,7 +94,7 @@ function build(l) {
   }));
   markers = points.map((p, i) => {
     const mesh = new T.Mesh(
-      new T.TorusGeometry(0.32, 0.014, 6, 36),
+      new T.TorusGeometry(C.quality.markerRadiusM, 0.003, 6, 36),
       new T.MeshBasicMaterial({ color: 0xc4f37a }),
     );
     mesh.position.copy(p.position).addScaledVector(p.normal, 0.018);
@@ -106,7 +109,7 @@ function build(l) {
   renderer.shadowMap.needsUpdate = true;
 }
 function menu() {
-  $("#status").textContent = "INSPECCIÓN POSTSISMO · 1D";
+  $("#status").textContent = "INSPECCIÓN POSTSISMO · 2A";
   active = false;
   paused = false;
   document.exitPointerLock?.();
@@ -131,9 +134,9 @@ function briefing(l) {
     "Edificio de cinco pisos: reconoce apoyos, losas y obstáculos. Evita los cables y elementos sin soporte.",
   ];
   $("#panel").innerHTML =
-    `<div class="eyebrow">MISIÓN 0${l + 1} / BRIEFING</div><h1>Primero observa.<br><em>Luego documenta.</em></h1><p class="intro">${descriptions[l]}</p><ol class="briefing-list"><li>Despega de H. Completa <b>4 puntos exteriores y 3 interiores</b>.</li><li>Captura a <b>0,45–1,2 m</b>, de frente, estable y con el rasgo completo. Se acepta con calidad ≥ 60%.</li><li>Entra por el letrero <b>ACCESO → INTERIOR</b>. Para subir al piso 2, busca el <b>hueco al frente-derecha</b> (visto desde la calle). No intentes atravesar losas.</li><li>Adentro activa <b>T: luz del módulo</b>. Evita obstáculos: un choque a más de 1,7 m/s termina el vuelo; un roce invalida la estabilidad durante 1,5 s.</li><li>Usa <b>G</b> para revisar fotos, <b>B</b> para orientar el regreso y <b>L</b> para aterrizar en H. B no es piloto automático.</li></ol><div class="controls-sheet"><span>W / S · avanzar / retroceder</span><span>A / D · lateral</span><span>Q / E · bajar / subir</span><span>Ratón o ← → · girar</span><span>↑ ↓ · orientar inclinación</span><span>F · foto / G · galería</span><span>T · luz / P · pausa</span><span>B · guía a base / L · aterrizar</span></div><p class="note">Cámara fija al cuerpo, velocidad máxima 2,4 m/s. Se estabiliza al soltar los controles. El video y HUD son una interfaz de juego; el módulo no transmite ni analiza datos durante el vuelo. Luz y rango láser son simplificaciones, no especificaciones del hardware real.</p><button id="launch">Entendido · iniciar vuelo →</button> <button id="backMenu">Volver</button>`;
+    `<div class="eyebrow">MISIÓN 0${l + 1} / BRIEFING</div><h1>Primero observa.<br><em>Luego documenta.</em></h1><p class="intro">${descriptions[l]}</p><ol class="briefing-list"><li>Despega de H. Completa <b>4 puntos exteriores y 3 interiores</b>.</li><li>Captura a <b>0,05–1,2 m (segmento de grieta)</b>, de frente, estable y con el rasgo completo. Se acepta con calidad ≥ 60%.</li><li>Entra por el letrero <b>ACCESO → INTERIOR</b>. Para subir al piso 2, busca el <b>hueco al frente-derecha</b> (visto desde la calle). No intentes atravesar losas.</li><li>Adentro activa <b>T: luz del módulo</b>. Evita obstáculos: un choque a más de 1,7 m/s termina el vuelo; un roce invalida la estabilidad durante 1,5 s.</li><li>Usa <b>G</b> para revisar fotos, <b>B</b> para orientar el regreso y <b>L</b> para aterrizar en H. B no es piloto automático.</li></ol><div class="controls-sheet"><span>W / S · avanzar / retroceder</span><span>A / D · lateral</span><span>Q / E · bajar / subir</span><span>Ratón o ← → · girar</span><span>↑ ↓ · orientar inclinación</span><span>F · foto / G · galería</span><span>T · luz / P · pausa</span><span>B · guía a base / L · aterrizar</span></div><p class="note">Cámara fija al cuerpo, velocidad máxima 2,4 m/s. Se estabiliza al soltar los controles. El video y HUD son una interfaz de juego; el módulo no transmite ni analiza datos durante el vuelo. Luz y rango láser son simplificaciones, no especificaciones del hardware real.</p><button id="launch">Entendido · iniciar vuelo →</button> <button id="backMenu">Volver</button>`;
   $("#panel").onclick = (e) => {
-    if (e.target.closest("#launch")) start(l);
+    if (e.target.closest("#launch")) preflight(l);
     if (e.target.closest("#backMenu")) menu();
   };
 }
@@ -146,13 +149,13 @@ function start(l) {
   camera.rotation.set(0, 0, 0);
   yaw = pitch = bank = tilt = 0;
   velocity.set(0, 0, 0);
-  photos = [];
+  photos = [];truth.clear();sortie=1;flightSeconds=0;flightToken++;sensorCache=null;
   chosen = 0;
   lastShot = -Infinity;
   lastImpact = -Infinity;
   lightOn = false;
   lamp.intensity = 0;
-  battery = 100;
+  battery = 100;batteryWarnings.clear();
   returning = false;
   paused = false;
   active = true;
@@ -161,7 +164,7 @@ function start(l) {
   $("#hud").hidden = false;
   $("#thumbnail").hidden = true;
   toast(
-    "Despega: W hacia el edificio, E sube. Entra por ACCESO; para subir al piso 2 usa el hueco al frente-derecha. Selecciona un punto y dispara con F a 0,45–1,2 m.",
+    "Despega: W hacia el edificio, E sube. Entra por ACCESO; para subir al piso 2 usa el hueco al frente-derecha. Selecciona un punto y dispara con F a 0,05–1,2 m (segmento de grieta).",
   );
   updateHUD();
 }
@@ -238,15 +241,10 @@ onblur = () => {
 function cam() {
   return renderer.xr.isPresenting ? renderer.xr.getCamera() : camera;
 }
-function laser() {
-  scene.updateMatrixWorld(true);
-  const c = cam();
-  ray.set(
-    c.getWorldPosition(new T.Vector3()),
-    c.getWorldDirection(new T.Vector3()),
-  );
-  return ray.intersectObjects(colliders, false)[0]?.distance ?? Infinity;
-}
+let sensorCache=null,lastSensorMs=-Infinity;
+function coneHits(){scene.updateMatrixWorld(true);const c=cam(),origin=c.getWorldPosition(new T.Vector3()),q=c.getWorldQuaternion(new T.Quaternion()),dirs=[new T.Vector3(0,0,-1)];for(let r=1;r<=C.laser.coneRings;r++)for(let j=0;j<C.laser.raysPerRing;j++){const a=j*Math.PI*2/C.laser.raysPerRing,t=Math.tan(C.laser.coneDeg*Math.PI/360)*r/C.laser.coneRings;dirs.push(new T.Vector3(Math.cos(a)*t,Math.sin(a)*t,-1).normalize());}return dirs.flatMap(d=>{ray.set(origin,d.applyQuaternion(q));const h=ray.intersectObjects(colliders,false)[0];if(!h)return [];const m=h.object.material;return [{distanceMm:h.distance*1000,glass:!!h.object.userData.glass,reflectance:h.object.userData.reflectance??(m.map?.45:m.color?(.2126*m.color.r+.7152*m.color.g+.0722*m.color.b):.5)}];});}
+function readSensors(timeMs=Date.now()){return samplePacket({timeMs,elapsedSeconds:flightSeconds,calibrated,pitchDeg:T.MathUtils.radToDeg(pitch+tilt),rollDeg:T.MathUtils.radToDeg(bank),yawDeg:T.MathUtils.radToDeg(yaw),battery,hits:coneHits(),sun:!environment.indoor(rig.position)&&environment.light>=1});}
+function laser(){const now=performance.now();if(!sensorCache||now-lastSensorMs>=1000/C.laser.hz){sensorCache=readSensors();lastSensorMs=now;}return sensorCache.laser.valid?sensorCache.laser.mm/1000:Infinity;}
 function point() {
   return points[chosen];
 }
@@ -278,15 +276,15 @@ function quality() {
         ),
       ),
     );
-  const checkCamera = new T.PerspectiveCamera(65, 16 / 9, 0.04, 180);
+  const checkCamera = new T.PerspectiveCamera(VFOV, 16 / 9, 0.04, 180);
   checkCamera.position.copy(pos);
   c.getWorldQuaternion(checkCamera.quaternion);
   checkCamera.updateMatrixWorld(true);
   const corners = [
-    [-0.2, -0.36],
-    [0.2, -0.36],
-    [-0.2, 0.36],
-    [0.2, 0.36],
+    [-C.quality.roiHalfWidthM, -C.quality.roiHalfHeightM],
+    [C.quality.roiHalfWidthM, -C.quality.roiHalfHeightM],
+    [-C.quality.roiHalfWidthM, C.quality.roiHalfHeightM],
+    [C.quality.roiHalfWidthM, C.quality.roiHalfHeightM],
   ];
   let framed = direction.dot(p.position.clone().sub(pos).normalize()) > 0.9;
   for (const [x, y] of corners) {
@@ -311,7 +309,7 @@ function quality() {
       light: illumination(p),
       framed,
       visible,
-      laserValid: Number.isFinite(d) && d >= 0.15 && d <= 4,
+      laserValid: Number.isFinite(d) && d >= C.laser.minMm/1000 && d <= C.laser.maxMm/1000,
       impact: performance.now() - lastImpact < 1500,
     }),
     distance,
@@ -333,7 +331,7 @@ function orient(dt) {
   rig.rotation.set(0, yaw, 0);
   camera.rotation.set(pitch + tilt, 0, bank);
 }
-function move(dt) {
+function move(dt) {if(battery<=0){velocity.set(0,0,0);ray.set(rig.position,new T.Vector3(0,-1,0));const hit=ray.intersectObjects(colliders,false)[0];if(hit&&hit.distance<=C.flight.collisionRadius+C.battery.descentMps*dt){finish("Batería agotada: descenso automático. SD recuperada.");return;}rig.position.y-=C.battery.descentMps*dt;return;}
   orient(dt);
   const v = new T.Vector3(
     (keys.KeyD ? 1 : 0) - (keys.KeyA ? 1 : 0),
@@ -368,11 +366,9 @@ function move(dt) {
       break;
     }
   }
-  battery = Math.max(0, battery - dt * (lightOn ? 0.16 : 0.12));
-  if (battery <= 0)
-    finish(
-      "Batería agotada: vuelo interrumpido. SD recuperada en la simulación.",
-    );
+  flightSeconds+=dt; battery = Math.max(0, battery - batteryDrain(dt,velocity.length(),lightOn,difficulty().batteryFactor));
+  for(const threshold of C.battery.warnings)if(battery<=threshold&&!batteryWarnings.has(threshold)){batteryWarnings.add(threshold);toast(`Batería ${threshold}%: regresa a base.`);}
+
 }
 function bearing(p) {
   const d = p.clone().sub(rig.position);
@@ -394,7 +390,7 @@ function updateHUD() {
   const inside = environment.indoor(rig.position);
   renderer.toneMappingExposure = inside ? (lightOn ? 0.9 : 0.23) : 1;
   const d = laser(),
-    valid = Number.isFinite(d) && d >= 0.15 && d <= 4;
+    valid = Number.isFinite(d) && d >= C.laser.minMm/1000 && d <= C.laser.maxMm/1000;
   $("#metrics").innerHTML =
     `<span class="${valid ? "" : "bad"}">LÁSER ${valid ? d.toFixed(2) + " m" : "FUERA DE RANGO"}</span><br>BATERÍA ${battery.toFixed(0)} %<br>ALTURA ${rig.position.y.toFixed(1)} m<br>VELOCIDAD ${velocity.length().toFixed(2)} m/s<br>${inside ? "INTERIOR · " + (lightOn ? "LUZ ON" : "LUZ OFF [T]") : "EXTERIOR"}<br>SD ${photos.length} fotos · ${accepted()}/${points.length} puntos`;
   const p = point(),
@@ -478,9 +474,9 @@ function snapshot() {
       ? 0.9
       : 0.23
     : 1;
-  const target = new T.WebGLRenderTarget(1920, 1080),
-    photoCam = new T.PerspectiveCamera(65, 16 / 9, 0.04, 180),
-    pixels = new Uint8Array(1920 * 1080 * 4);
+  const target = new T.WebGLRenderTarget(C.camera.width, C.camera.height),
+    photoCam = new T.PerspectiveCamera(VFOV, 16 / 9, 0.04, 180),
+    pixels = new Uint8Array(C.camera.width * C.camera.height * 4);
   scene.updateMatrixWorld(true);
   cam().getWorldPosition(photoCam.position);
   cam().getWorldQuaternion(photoCam.quaternion);
@@ -492,7 +488,7 @@ function snapshot() {
     renderer.xr.enabled = false;
     renderer.setRenderTarget(target);
     renderer.render(scene, photoCam);
-    renderer.readRenderTargetPixels(target, 0, 0, 1920, 1080, pixels);
+    renderer.readRenderTargetPixels(target, 0, 0, C.camera.width, C.camera.height, pixels);
   } finally {
     renderer.setRenderTarget(before);
     renderer.xr.enabled = xr;
@@ -500,70 +496,42 @@ function snapshot() {
     target.dispose();
   }
   const out = document.createElement("canvas");
-  out.width = 1920;
-  out.height = 1080;
+  out.width = C.camera.width;
+  out.height = C.camera.height;
   const ctx = out.getContext("2d"),
-    img = ctx.createImageData(1920, 1080);
-  for (let y = 0; y < 1080; y++)
+    img = ctx.createImageData(C.camera.width, C.camera.height);
+  for (let y = 0; y < C.camera.height; y++)
     img.data.set(
-      pixels.subarray((1079 - y) * 7680, (1080 - y) * 7680),
-      y * 7680,
+      pixels.subarray((C.camera.height - 1 - y) * C.camera.width*4, (C.camera.height - y) * C.camera.width*4),
+      y * C.camera.width*4,
     );
   ctx.putImageData(img, 0, 0);
-  return out.toDataURL("image/jpeg", 0.8);
+  return degradePhoto(out);
 }
-function capture() {
-  if (!active || paused || xrMode === "immersive-ar") return;
-  const now = performance.now();
-  if (now - lastShot < 1000) {
-    toast("Espera 1 segundo entre disparos.");
-    return;
-  }
-  const p = point(),
-    q = quality();
-  lastShot = now;
-  const record = {
-    image: snapshot(),
-    quality: q,
-    distance: q.laser,
-    tilt: T.MathUtils.radToDeg(pitch + tilt),
-    width: p.width,
-    name: p.name,
-    point: chosen,
-    inside: p.inside,
-    time: new Date().toLocaleTimeString("es-CO"),
-  };
-  photos.push(record);
-  lastShot = performance.now();
-  shutter();
-  $("#thumbnail").src = record.image;
-  $("#thumbnail").hidden = false;
-  if (q.accepted) {
-    p.state = "aceptada";
-    p.best = record;
-    toast(
-      `✓ Foto aceptada · ${q.score}% · guardada en SD. Pulsa G para verla.`,
-    );
-    const next = points.findIndex((p) => !p.best);
-    if (next >= 0) chosen = next;
-    else {
-      returning = true;
-      toast(
-        "Todos los puntos documentados. Pulsa B para seguir la guía de regreso y L para aterrizar.",
-      );
-    }
-  } else {
-    p.state = p.best ? "aceptada" : "rechazada";
-    toast(`Foto rechazada · ${q.score}%: ${q.reasons.join(" ")}`);
-  }
-  updateHUD();
+async function capture() {
+ if(!active||paused||xrMode) return;
+ if(photos.length>=C.sd.capacity){toast('SD llena: regresa a base.');return;}
+ if(capturing||performance.now()-lastShot<1000){toast('Espera al obturador y al intervalo entre fotos.');return;}
+ capturing=true;const token=flightToken;toast('Obturador…');
+ await new Promise(r=>setTimeout(r,C.camera.shutterMs));
+ if(!active||paused||token!==flightToken){capturing=false;return;}
+ // Todas las lecturas y la pose se congelan EN EL INSTANTE DE EXPOSICIÓN, no al pulsar F.
+ const p=point(),q=quality(),timeMs=Date.now(),packet=readSensors(timeMs),id=photos.length+1;
+ const image=snapshot();
+ const record={id,timeMs,image,sensors:packet,quality:{score:q.score,accepted:q.accepted,reasons:q.reasons},distance:packet.laser.valid?packet.laser.mm/1000:Infinity,tilt:packet.imu.pitchDeg,name:p.name,point:chosen,inside:p.inside,time:new Date(timeMs).toLocaleTimeString('es-CO'),sortie};
+ truth.set(id,{timeMs,point:chosen,distanceMm:q.distance*1000,angleDeg:q.angle,widthMm:p.width,pitchDeg:T.MathUtils.radToDeg(pitch+tilt),rollDeg:T.MathUtils.radToDeg(bank),position:rig.position.toArray()});
+ photos.push(record);lastShot=performance.now();capturing=false;shutter();
+ $('#thumbnail').src=image;$('#thumbnail').hidden=false;
+ if(q.accepted){p.state='aceptada';p.best=record;const next=points.findIndex(p=>!p.best);if(next>=0)chosen=next;else returning=true;}
+ else p.state=p.best?'aceptada':'rechazada';
+ toast(q.accepted?`Foto ${id} guardada en SD · calidad local ${q.score}%.`:`Foto ${id} guardada (${q.score}%): ${q.reasons.join(' ')}`);updateHUD();
 }
 function photoCard(p, i, analysis = false) {
-  const e = estimate(p.width, p.distance);
-  return `<article><img src="${p.image}" alt="Foto real ${i + 1}: ${p.name}" loading="lazy"><h3>${i + 1}. ${p.name}</h3><p class="${p.quality.accepted ? "good" : "bad"}">${p.quality.accepted ? "ACEPTADA" : "RECHAZADA"} · calidad ${p.quality.score}%</p><p>${p.time} · láser ${Number.isFinite(p.distance) ? p.distance.toFixed(2) + " m" : "sin lectura"} · ángulo ${p.quality.angle.toFixed(0)}° · luz ${(p.quality.light * 100).toFixed(0)}%<br>${p.quality.reasons.join("<br>") || "Encuadre, distancia y estabilidad correctos."}</p>${analysis && p.quality.accepted ? `<p>${e.detected ? `Traza sintética resoluble: ${e.estimated.toFixed(2)} ± ${e.error.toFixed(2)} mm` : "Fisura por debajo de la resolución óptica simulada. No detectar no significa ausencia de daño."}</p>` : ""}</article>`;
+  const e = {detected:false};
+  return `<article><img src="${p.image}" alt="Foto real ${i + 1}: ${p.name}" loading="lazy"><h3>${i + 1}. ${p.name}</h3><p class="${p.quality.accepted ? "good" : "bad"}">${p.quality.accepted ? "ACEPTADA" : "RECHAZADA"} · calidad ${p.quality.score}%</p><p>${p.time} · láser ${Number.isFinite(p.distance) ? p.distance.toFixed(2) + " m" : "sin lectura"} · cabeceo ${(p.sensors.imu.pitchDeg).toFixed(1)}° · batería ${p.sensors.battery.percent.toFixed(0)}%<br>${p.quality.reasons.join("<br>") || "Encuadre, distancia y estabilidad correctos."}</p>${analysis && p.quality.accepted ? `<p>${e.detected ? `Traza sintética resoluble: ${e.estimated.toFixed(2)} ± ${e.error.toFixed(2)} mm` : "Fisura por debajo de la resolución óptica simulada. No detectar no significa ausencia de daño."}</p>` : ""}</article>`;
 }
 let galleryWasPaused = false;
-function gallery() {
+function gallery() {if(active){toast("SD no consultable durante el vuelo: sin enlace de datos. Revisa las imágenes en tierra.");return;}
   if ($("#gallery").open) {
     $("#gallery").close();
     paused = galleryWasPaused;
@@ -594,7 +562,7 @@ function returnToBase() {
 }
 function land() {
   if (!active || paused) return;
-  if (accepted() < points.length) {
+  if (false && accepted() < points.length) {
     toast(
       `Faltan ${points.length - accepted()} puntos aceptados. Completa la inspección antes de aterrizar.`,
     );
@@ -619,7 +587,7 @@ function finish(reason) {
   active = false;
   paused = false;
   clearKeys();
-  velocity.set(0, 0, 0);
+  velocity.set(0, 0, 0);flightToken++;capturing=false;
   finishReason = reason;
   renderer.xr.getSession()?.end();
   document.exitPointerLock?.();
@@ -809,3 +777,6 @@ if ("serviceWorker" in navigator)
       );
     })
     .catch(() => {});
+
+function degradePhoto(out){const c=out.getContext('2d'),img=c.getImageData(0,0,out.width,out.height),gain=1+(Math.random()*2-1)*C.camera.exposureVariation;for(let i=0;i<img.data.length;i+=4){const noise=(Math.random()*2-1)*C.camera.noiseAmplitude;for(let j=0;j<3;j++)img.data[i+j]=Math.max(0,Math.min(255,img.data[i+j]*gain+noise));}c.putImageData(img,0,0);const blur=velocity.length()*C.camera.blurPxPerMps;if(blur>.1){const copy=document.createElement('canvas');copy.width=out.width;copy.height=out.height;copy.getContext('2d').drawImage(out,0,0);c.globalAlpha=.25;for(const sign of [-1,1])c.drawImage(copy,sign*blur,0);c.globalAlpha=1;}return out.toDataURL('image/jpeg',C.camera.jpegQuality);}
+function preflight(l){active=false;$('#panel').hidden=false;$('#panel').innerHTML=`<div class="eyebrow">PREVUELO / MPU6050 SIN MAGNETÓMETRO</div><h1>Base de calibración</h1><p>Dron quieto sobre H. Calibra durante ${C.imu.calibrationSeconds} s; sin calibración aumenta la deriva de yaw.</p><p><label><input id="checkBattery" type="checkbox"> Batería nueva / revisada</label></p><p><label><input id="checkSD" type="checkbox"> ${photos.length?'SD revisada; conservar fotos de esta misión':'SD vacía y lista'}</label></p><button id="calibrate">Calibrar quieto ${C.imu.calibrationSeconds} s</button><p id="calState">Sin calibrar</p><button id="takeoff">Despegar sin calibrar</button>`;calibrated=false;let calibrating=false;$('#calibrate').onclick=async()=>{if(calibrating)return;calibrating=true;$('#calibrate').disabled=true;for(let i=C.imu.calibrationSeconds;i>0;i--){$('#calState').textContent=`Quieto en base… ${i} s`;await new Promise(r=>setTimeout(r,1000));if(!$('#calState'))return;}calibrated=true;$('#calState').textContent='Calibración terminada. Cabeceo/alabeo fiables; yaw aún deriva.';$('#takeoff').textContent='Despegar calibrado';calibrating=false;};$('#takeoff').onclick=()=>{if(calibrating)return;if(!$('#checkBattery').checked||!$('#checkSD').checked){$('#calState').textContent='Completa batería y SD antes de despegar.';return;}start(l);};}

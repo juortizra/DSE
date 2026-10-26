@@ -112,6 +112,7 @@ export function createWorld(level = 0, interiors = false) {
     m.receiveShadow = true;
     group.add(m);
     if (solid) colliders.push(m);
+    if(color==="#335661")m.userData.glass=true;
     return m;
   }
   function rod(a, b, r, color, solid = false) {
@@ -122,6 +123,7 @@ export function createWorld(level = 0, interiors = false) {
     m.castShadow = true;
     group.add(m);
     if (solid) colliders.push(m);
+    if(color==="#335661")m.userData.glass=true;
     return m;
   }
   function polyline(vertices, r, color) {

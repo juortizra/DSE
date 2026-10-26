@@ -1,3 +1,4 @@
+import {CONFIG as C} from "./config.js";
 // Límites de fotografía del juego, NO especificaciones certificadas del sensor.
 export function photoQuality({
   distance,
@@ -12,15 +13,15 @@ export function photoQuality({
   const reasons = [];
   if (!laserValid)
     reasons.push(
-      "Láser fuera de rango (0,15–4 m) o sin superficie: apunta al muro.",
+      "Láser fuera de rango (50–1200 mm) o sin superficie: apunta al muro.",
     );
-  if (distance > 1.2)
+  if (distance > C.quality.maxDistanceM)
     reasons.push(
       `Muy lejos (${distance.toFixed(2)} m): acércate a 1,2 m o menos.`,
     );
-  if (distance < 0.45)
+  if (distance < C.quality.minDistanceM)
     reasons.push(
-      `Demasiado cerca (${distance.toFixed(2)} m): retrocede hasta 0,45 m.`,
+      `Demasiado cerca (${distance.toFixed(2)} m): retrocede hasta 0,05 m.`,
     );
   if (!framed)
     reasons.push(
@@ -30,15 +31,15 @@ export function photoQuality({
     reasons.push(
       "Objetivo oculto por otra superficie: busca una línea de visión despejada.",
     );
-  if (angle > 25)
+  if (angle > C.quality.angleDeg)
     reasons.push(
       `Muy inclinado respecto al muro (${angle.toFixed(0)}°): orienta el dron de frente.`,
     );
-  if (speed > 0.35 || impact)
+  if (speed > C.quality.maxSpeed || impact)
     reasons.push(
       "Dron en movimiento: foto movida. Suelta los controles y espera a estabilizar.",
     );
-  if (light < 0.25)
+  if (light < C.quality.minLight)
     reasons.push(
       "Muy oscuro: activa la luz del módulo [T] o busca un ángulo iluminado.",
     );
@@ -51,6 +52,6 @@ export function photoQuality({
         0.15 * clamp(light) +
         0.2 * (framed && visible ? 1 : 0)),
   );
-  if (reasons.length) score = Math.min(59, score);
-  return { score, accepted: score >= 60, reasons };
+  if (reasons.length) score = Math.min(C.quality.accepted-1, score);
+  return { score, accepted: score >= C.quality.accepted, reasons };
 }

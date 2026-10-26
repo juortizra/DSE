@@ -16,7 +16,7 @@ test("Toma estable frontal aceptada a partir de 60%", () => {
 });
 for (const [name, change, reason] of [
   ["lejos", { distance: 2.3 }, "Muy lejos"],
-  ["cerca", { distance: 0.2 }, "Demasiado cerca"],
+  ["cerca", { distance: 0.02 }, "Demasiado cerca"],
   ["ángulo", { angle: 55 }, "inclinado"],
   ["movida", { speed: 1.2 }, "movimiento"],
   ["oscuridad", { light: 0.15 }, "oscuro"],
