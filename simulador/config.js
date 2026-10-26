@@ -18,6 +18,7 @@ export const CONFIG = {
   },
   laser: {
     mappedReflectance: 0.45,
+    offsetFromCameraM: [0,0,0],
     minMm: 50,
     maxMm: 1200,
     relativeError: 0.03,

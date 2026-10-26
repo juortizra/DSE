@@ -1,4 +1,4 @@
-const CACHE = "dse-2g-v2";
+const CACHE = "dse-2g-v3";
 const FILES = [
   "./",
   "./index.html",
