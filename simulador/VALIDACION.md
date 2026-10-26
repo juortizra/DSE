@@ -26,3 +26,10 @@
 - El ángulo al muro y la inclinación estructural usan referencias sintéticas; no son funciones nativas del MPU6050.
 - La página pública puede consultarse con la herramienta externa de lectura. El navegador de pruebas del entorno no tiene acceso directo a github.io: las comprobaciones interactivas de consola son locales. Despliegues confirmados por Actions.
 - Sin prueba física en Meta Quest: XR sigue siendo inspección visual experimental; flujo completo en escritorio.
+
+## Corrección posterior del láser
+- Se eliminó el uso de una lectura anterior del HUD para calificar la foto: el paquete de exposición es la única fuente para calidad y metadatos.
+- Distancia del HUD en mm, guía medida desde cámara y diagnóstico separado para retorno inválido o resolución menor de 2 píxeles.
+- `npm run test:laser`: navegador con aleatoriedad real (sin sustituir Math.random), 7 puntos por nivel, múltiples lecturas por punto contrastadas con distancia de escena y error configurado; veredictos verde/amarillo/rojo después de fotos válidas. Los fallos solares genuinos se repiten, no se sustituyen por lecturas inventadas.
+- Regresión de caché inválida frente a lectura de exposición válida. Caso a 800 mm con láser válido pero capilar no resoluble: INDETERMINADO con explicación óptica y consejo, no “sensor roto”.
+- El arnés coloca el dron frente al objetivo y acelera la cola de tierra; no equivale a pilotaje manual ni valida hardware.

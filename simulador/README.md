@@ -11,6 +11,11 @@ Selecciona edificio y dificultad → briefing → **prevuelo** (batería/SD y ca
 - Entra por ACCESO; el hueco para subir está al frente-derecha visto desde la calle. Choques fuertes terminan el vuelo y conservan la SD.
 - Se puede aterrizar incompleto. **INDETERMINADO** ofrece segunda salida con nueva batería/SD de vuelo, conservando el archivo previo de la misión en tierra. Recargar o abandonar borra la sesión.
 
+## Lectura del láser y repetición de fotos
+El HUD muestra **milímetros** y el motivo real si no hay retorno (rango, vidrio o sol). La guía al checkpoint usa el origen de la cámara, no el centro del dron. La calidad de cada foto usa exactamente la lectura guardada al exponer, no una lectura anterior del HUD.
+
+**Encuadre aceptado no significa grieta medible.** El HUD indica el ancho mínimo correspondiente a 2 píxeles a esa distancia. En tierra se distingue láser inválido de lectura válida con resolución insuficiente, y se indica cómo repetir la toma. No se rellenan distancias ni se fuerza un color si faltan datos.
+
 ## Sensores y medición
 Cámara virtual 1280×720/HFOV 82°, con exposición, ruido, desplazamiento de imagen por movimiento y JPEG. Láser de 50–1200 mm con error y cono discretizado, interferencia solar, vidrio y reflectancia simplificada. IMU con error de actitud y deriva de yaw; no hay magnetómetro. Batería nominal de 8 minutos **simulados**, con consumo variable; SD de 60 fotos por salida.
 
