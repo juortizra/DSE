@@ -540,3 +540,5 @@ select {
 #galleryBtn {
   opacity: 0.65;
 }
+
+[hidden]{display:none!important} .home-actions{display:flex;gap:1rem;flex-wrap:wrap}.diagram{padding:1rem;border:1px solid #a8d7b2}dialog{max-width:min(820px,90vw);max-height:85vh;overflow:auto;background:#172a30;color:#edf5ef;border:1px solid #a8d7b2}#demoBar{position:fixed;bottom:35px;left:5%;width:90%;z-index:20;background:#10262ef2;padding:12px;border:1px solid #c4f37a}#demoBar p{margin:0 0 8px}header{z-index:30}button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid #f5cf72;outline-offset:3px}

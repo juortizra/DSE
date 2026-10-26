@@ -1,9 +1,10 @@
-const CACHE = "dse-agent-evidence-v1";
+const CACHE = "dse-3a-v1";
 const FILES = [
   "./",
   "./index.html",
   "./style.css",
   "./app.js",
+  "./navigation.js",
   "./world.js",
   "./config.js",
   "./sensors.js",

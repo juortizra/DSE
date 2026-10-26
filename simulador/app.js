@@ -1,3 +1,4 @@
+import {planRoute} from "./navigation.js";
 import { zipStore, sessionFiles } from "./export.js";
 import { scoreSession } from "./scoring.js";
 import { evaluateAgent, LABELS, DISCLAIMER } from "./agent.js";
@@ -164,6 +165,7 @@ function build(l) {
   renderer.shadowMap.needsUpdate = true;
 }
 function menu() {
+  stopDemo();
   processingToken++;
   if (humGain) humGain.gain.value = 0;
   $("#status").textContent = "INSPECCIÓN POSTSISMO · 2G · AGENTE CORREGIDO";
@@ -183,8 +185,11 @@ function menu() {
       )
       .join(
         "",
-      )}</select></label><label><input type="checkbox" id="replica" ${quakeEnabled ? "checked" : ""}> Réplica sísmica opcional</label></div><p>Primera visita: en la vivienda hay tutorial guiado de ${C.tutorial.seconds} s.</p><section id="missions">${["Vivienda / sector residencial", "Apartamentos / sector urbano", "Edificio / corredor vial"].map((n, i) => `<button data-level="${i}"><small>MISIÓN 0${i + 1}</small><h2>${n}</h2><p>Reconoce el sitio, reúne evidencias y decide.</p><strong>Preparar misión →</strong></button>`).join("")}</section><p class="note">Análisis sintético educativo, no una IA real. Sin CDN ni transmisión. Ratón y teclado necesarios para pilotar.</p>`;
+      )}</select></label><label><input type="checkbox" id="replica" ${quakeEnabled ? "checked" : ""}> Réplica sísmica opcional</label></div><p>Primera visita: en la vivienda hay tutorial guiado de ${C.tutorial.seconds} s.</p><div class="home-actions"><button id="play">Jugar</button><button id="demo">Ver demostración</button><button id="about">Acerca del proyecto</button></div><p>Recomendado: Chrome o Edge en computador. En Quest, usa su navegador compatible con WebXR.</p><section id="missions" hidden>${["Vivienda / sector residencial", "Apartamentos / sector urbano", "Edificio / corredor vial"].map((n, i) => `<button data-level="${i}"><small>MISIÓN 0${i + 1}</small><h2>${n}</h2><p>Reconoce el sitio, reúne evidencias y decide.</p><strong>Preparar misión →</strong><p>${progressText(i)}</p></button>`).join("")}</section><p class="note">Análisis sintético educativo, no una IA real. Sin CDN ni transmisión. Ratón y teclado necesarios para pilotar.</p>`;
   $("#panel").onclick = (e) => {
+    if(e.target.closest("#play")) $("#missions").hidden=false;
+    if(e.target.closest("#demo")) beginDemo();
+    if(e.target.closest("#about")) $("#aboutProject").showModal();
     const b = e.target.closest("[data-level]");
     if (b) {
       difficultyKey = $("#difficulty").value;
@@ -1009,6 +1014,7 @@ function renderGroundSummary() {
     results: groundResults,
   });
   const a = agentResult;
+  if(demoRunning){demoStage="done";demoCaption("Análisis terminado: el agente explica sus reglas. El veredicto es orientativo; no sustituye al evaluador certificado.");setTimeout(()=>{if(!demoRunning)return;decisionRecord={decision:a.verdict,reason:"Demostración: se acepta la sugerencia calculada del agente."};showReport();},300);}
   $("#groundSummary").innerHTML =
     `<h2>Sugerencia: ${a.label}</h2><p>${DISCLAIMER}</p><p>${a.referral}</p>${quakeDone ? "<p>Réplica modelada: se exige repetir la Fase 1. Las fotos previas no cubren checkpoints.</p>" : ""}<p>Cobertura fotográfica ${(a.coverage * 100).toFixed(0)}% · anchos medidos en ${a.measuredPoints}/${points.length} puntos. Las limitaciones ópticas no anulan evidencias estructurales.</p><p>Confianza de cobertura/calidad ${(a.confidence * 100).toFixed(0)}% (no probabilidad de seguridad).</p><ul>${a.rules.map((r) => `<li>${LABELS[r.level]} · ${r.text}</li>`).join("")}</ul>${a.measurementWarnings.length ? "<h3>Limitaciones de medición (no son checkpoints ausentes)</h3><ul>" + a.measurementWarnings.map((t) => "<li>" + t + "</li>").join("") + "</ul>" : ""}${a.missing.length ? "<h3>Qué falta</h3><ul>" + a.missing.map((t) => "<li>" + t + "</li>").join("") + '</ul><button id="secondSortie">Segunda salida · batería nueva y conservar fotos</button>' : ""}${!a.missing.length && a.measurementWarnings.length ? '<button id="secondSortie">Mejorar medidas · segunda salida opcional</button>' : ""}<h3>No evaluable con este sistema</h3><ul>${a.notEvaluable.map((t) => "<li>" + t + "</li>").join("")}</ul>${a.verdict === null ? '<button id="partialReport">Ver informe parcial (INDETERMINADO)</button>' : ""}<div class="choices">${LABELS.map((v, i) => `<button data-verdict="${i}" ${a.verdict === null ? "disabled" : ""}>${v}</button>`).join("")}</div><label>Si discrepas del agente, elige una razón: <select id="disagreeReason"><option value="">Seleccionar…</option>${C.disagreementReasons.map((r, i) => `<option value="${i}">${r}</option>`).join("")}</select></label><div id="result"></div><button id="again">Volver a misiones</button>`;
   $("#again").onclick = menu;
@@ -1148,12 +1154,38 @@ function xrFrame(frame) {
     }
   }
 }
+let demoRunning=false, demoStage="", demoRoute=[], demoIndex=0, demoWait=0, demoBusy=false, demoElapsed=0;
+function progressText(i){try{const p=JSON.parse(localStorage.getItem('dse-progress')||'{}')[i];return p?`${p.completed?'✓ Completado':'En progreso'} · mejor ${p.best}/100`:'Sin completar';}catch{return 'Progreso local no disponible';}}
+function saveProgress(i,score,completed){if(demoRunning)return;try{const p=JSON.parse(localStorage.getItem('dse-progress')||'{}');p[i]={best:Math.max(score,p[i]?.best||0),completed:completed||p[i]?.completed||false};localStorage.setItem('dse-progress',JSON.stringify(p));}catch{toast('No se pudo guardar el progreso local.');}}
+function demoCaption(text){$('#demoCaption').textContent=text;}
+function stopDemo(){demoRunning=false;$('#demoBar').hidden=true;}
+function demoTravel(target){demoRoute=planRoute(T,rig.position,target,bounds,environment.height+5);demoWait=0;}
+function beginDemo(){
+ stopDemo();difficultyKey='aprendiz';quakeEnabled=false;resumeSortie=false;start(1);calibrated=true;lightOn=true;lamp.intensity=12;demoRunning=true;demoStage='takeoff';demoIndex=0;demoElapsed=0;demoBusy=false;$('#demoBar').hidden=false;
+ demoCaption('Despegue. El módulo funciona con batería y almacena sensores e imágenes en la SD; no transmite análisis.');
+ try{demoTravel(rig.position.clone().setY(2));}catch(e){stopDemo();toast(e.message);}
+}
+async function demoFrame(dt){
+ demoElapsed+=dt;flightSeconds+=dt;tickSensors(dt);battery=Math.max(0,battery-batteryDrain(dt,velocity.length(),lightOn,1));
+ if(demoBusy)return;
+ if(demoRoute.length){const target=demoRoute[0],d=target.clone().sub(rig.position),travel=Math.min(d.length(),1.8*dt);velocity.copy(d).normalize().multiplyScalar(1.8);rig.position.addScaledVector(d.normalize(),travel);if(rig.position.distanceTo(target)<.01)demoRoute.shift();if(d.length()>.01){yaw=Math.atan2(-d.x,-d.z);pitch=0;orient(dt);}return;}
+ velocity.set(0,0,0);demoWait+=dt;
+ try{
+ if(demoStage==='takeoff'&&demoWait>6){demoStage='points';demoWait=0;demoTravel(points[0].position.clone().addScaledVector(points[0].normal,.45+C.camera.offsetM));}
+ else if(demoStage==='points'){
+ chosen=demoIndex;const p=point();yaw=Math.atan2(p.normal.x,p.normal.z);pitch=bank=tilt=0;rig.rotation.set(0,yaw,0);camera.rotation.set(0,0,0);
+ demoCaption(`Checkpoint ${demoIndex+1}/7: estabilización, iluminación, foto y lectura simultánea de cámara, láser e IMU. Todo queda en la SD.`);
+ if(demoWait>5){demoBusy=true;await capture();demoBusy=false;if(!demoRunning)return;if(!p.best){demoWait=3;return;}demoIndex++;if(demoIndex<points.length){demoTravel(points[demoIndex].position.clone().addScaledVector(points[demoIndex].normal,.45+C.camera.offsetM));}else{demoStage='return';demoTravel(environment.base.clone().setY(.5));demoCaption('Regreso a la base: no hay inferencia durante el vuelo. La unidad de tierra recibirá la tarjeta SD.');}}
+ }else if(demoStage==='return'&&demoWait>Math.max(4,120-demoElapsed)){demoStage='analysis';demoCaption('Aterrizaje e inserción de SD. La unidad de tierra simula IA liviana, mide con incertidumbre y aplica reglas; el evaluador conserva la decisión oficial.');land();}
+ }catch(e){stopDemo();toast(e.message);}
+}
+$('#takeControl').onclick=()=>{stopDemo();velocity.set(0,0,0);clearKeys();toast('Ahora controlas el dron.');};
 let hudClock = 0;
 renderer.setAnimationLoop((t, frame) => {
   const dt = Math.min((t - last) / 1000 || 0, C.flight.dtMax);
   last = t;
   if (active && !paused) {
-    move(dt);
+    if(demoRunning) demoFrame(dt); else move(dt);
     extras(dt);
     hudClock += dt;
     if (hudClock > 0.12) {
@@ -1290,6 +1322,7 @@ function showReport() {
       goodCount: accepted(),
     });
   decisionRecord.score = score;
+  saveProgress(level,score.total,agentResult.coverage===1 && decisionRecord.decision!==null);
   $("#result").innerHTML =
     `<h2>${decisionRecord.decision === null ? "Informe parcial: INDETERMINADO" : score.critical ? "ERROR CRÍTICO: rojo clasificado como verde" : decisionRecord.decision === expected ? "Decisión acertada" : "Decisión distinta al escenario"}</h2><p>Tu decisión: ${LABELS[decisionRecord.decision] ?? "INDETERMINADO"} · escenario: ${LABELS[expected]} · agente: ${agentResult.label}.</p><p>${decisionRecord.reason}</p><h3>Puntaje ${score.total}/100</h3><p>Decisión ${score.decision}/${C.score.decision} · fotos ${score.photography.toFixed(1)}/${C.score.photo} · eficiencia ${score.efficiency.toFixed(1)}/${C.score.efficiency} · seguridad ${score.safety.toFixed(1)}/${C.score.safety}</p><p>${C.scenarios[level].collapse ? "Colapso modelado: no ingresar." : cases[level].explanation}</p><p>${DISCLAIMER}</p><h3>Informe: verdad de terreno revelada</h3><div class="report-table">${photos
       .map((p) => {

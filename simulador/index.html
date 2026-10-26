@@ -12,7 +12,7 @@
     <header>
       <b>◈ DSE <span>LABORATORIO DE CAMPO</span></b>
       <div id="status">INSPECCIÓN POSTSISMO</div>
-      <button id="menuBtn">Misiones</button>
+      <button id="controlsBtn">Controles</button><button id="menuBtn">Misiones</button>
     </header>
     <div id="hud" hidden>
       <aside>
@@ -56,6 +56,9 @@
       <p id="fullCaption"></p>
       <img id="fullPhoto" alt="Fotografía renderizada ampliada" />
     </dialog>
+    <aside id="demoBar" hidden><p id="demoCaption" role="status" aria-live="polite"></p><button id="takeControl">Interrumpir / tomar el control</button></aside>
+    <dialog id="controlsDialog"><h2>Controles</h2><p>W/S avanzar · A/D lateral · Q/E altura · flechas o ratón orientar · Shift precisión · F foto · T luz · B guía a base · L aterrizar · P pausa · G SD en tierra. Esc libera el ratón.</p><p>Recomendado: Chrome o Edge en computador. En gafas consulta <a href="QA-QUEST.md">QA-QUEST</a>.</p><button onclick="this.closest('dialog').close()">Cerrar</button></dialog>
+    <dialog id="aboutProject"><h2>Acerca del proyecto DSE</h2><p>Autor: juortizra (usuario del repositorio; nombre completo por confirmar).</p><p>Contexto didáctico: inspección después del sismo. La fecha 10 de agosto de 2026 en Colombia forma parte del escenario propuesto; no se presenta como un terremoto histórico verificado.</p><p class="diagram">Dron + módulo con batería → SD física → unidad de tierra con IA y batería → reglas → veredicto orientativo</p><p>El vuelo, la cámara renderizada, láser, IMU, batería, SD y TFT simulan componentes del prototipo. La detección de grietas es un adaptador sintético del modelo de IA liviano: NO ejecuta una red neuronal ni mide el rendimiento de una Raspberry Pi. Las reglas sí se ejecutan con los datos simulados y explican su recomendación. El piloto decide.</p><p>ODS 11: comunidades resilientes y triage postsismo. ODS 9: instrumentación e infraestructura; ODS 3: reducir exposición a estructuras peligrosas; ODS 10: herramienta educativa accesible y sin conexión, sin sustituir una evaluación profesional.</p><p>El módulo consume una batería simulada. La unidad de tierra se concibe alimentada por batería: su autonomía real queda [VERIFICAR], no está modelada eléctricamente. La aplicación puede quedar en caché después de la primera carga completa.</p><p>Limitaciones: resolución de grietas, superficies y luz, error de sensores, daños ocultos, réplicas y falsos positivos/negativos. No certifica habitabilidad. Evaluación oficial únicamente por personal certificado.</p><p><a href="https://github.com/juortizra/DSE" target="_blank" rel="noopener">Código y documentación del proyecto</a></p><button onclick="this.closest('dialog').close()">Cerrar</button></dialog>
     <div id="updateNotice" hidden>
       Nueva versión disponible. <button id="applyUpdate">Actualizar</button>
     </div>
@@ -64,6 +67,6 @@
       Simulación educativa. La clasificación oficial la hace el evaluador
       certificado.
     </footer>
-    <script type="module" src="app.js"></script>
+    <script>document.querySelector("#controlsBtn").onclick=()=>document.querySelector("#controlsDialog").showModal();</script><script type="module" src="app.js"></script>
   </body>
 </html>
