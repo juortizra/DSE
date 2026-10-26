@@ -1,6 +1,29 @@
 // ÚNICA fuente de parámetros de diseño nuevos. No son especificaciones certificadas.
 // [VERIFICAR] = contrastar en el prototipo y/o con el evaluador responsable.
 export const CONFIG = {
+  xr: {
+    monitorWidthM: 1.2,
+    monitorDistanceM: 1.5,
+    maquetteScale: 1 / 60,
+    tableHeightM: 0.8,
+    assumedEyeHeightM: 1.6,
+    minScale: 1 / 150,
+    maxScale: 1 / 20,
+    remoteSpeedMps: 1.5,
+    immersiveSpeedMps: 0.8,
+    fpvHz: 20,
+    framebufferScale: 0.8,
+    sdGripDistanceM: 0.18,
+    sdInsertDistanceM: 0.2,
+    note: "[VERIFICAR] escala, ergonomía, comodidad, FPS y gestos en Quest real. Fallback de altura solo estimado si no hay referencia de suelo.",
+  },
+  demo: {
+    minFlightSeconds: 120,
+    speedMps: 1.8,
+    hoverSeconds: 5,
+    dtMax: 0.25,
+    note: "[VERIFICAR] duración objetivo total 2–3 minutos con pestaña visible; depende del rendimiento.",
+  },
   camera: {
     width: 1280,
     height: 720,

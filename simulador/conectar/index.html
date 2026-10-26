@@ -1,3 +1,78 @@
-<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Conectar Quest · DSE</title><link rel="icon" href="../icon.svg"><link rel="stylesheet" href="../style.css"></head><body class="document-page"><main><a href="../">← Volver al simulador</a><h1>Conectar las gafas</h1><p>No existe emparejamiento automático por QR. El código solo contiene la dirección del juego: ábrela en el navegador de las gafas.</p><h2>URL del juego en este servidor</h2><p><a id="gameURL"></a></p><div id="qr" aria-label="Código QR con la URL del juego"></div><p id="pageURL"></p><h2>Verificador de entorno</h2><ul id="environment" aria-live="polite"><li>Comprobando…</li></ul><button id="check">Volver a comprobar</button> <button id="refresh" hidden>Actualizar caché instalada</button><p>Espera a «Sin conexión listo» antes de cortar la red. Conserva la misma URL y navegador. Los permisos de XR y passthrough deben probarse en las Quest en modo avión; el sistema puede desalojar la caché.</p><h2>A · Link público (recomendado)</h2><ol><li>Con internet, abre el link público en Meta Quest Browser.</li><li>Carga el juego y esta página; espera la instalación completa.</li><li>Inicia una misión y elige VR o MR si aparecen. Luego prueba modo avión.</li></ol><h2>B · USB y adb reverse</h2><p>Requiere modo desarrollador de Quest, depuración USB autorizada y ADB instalado. No se configura desde el juego.</p><pre>python -m http.server 8000 --directory simulador
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Conectar Quest · DSE</title>
+    <link rel="icon" href="../icon.svg" />
+    <link rel="stylesheet" href="../style.css" />
+  </head>
+  <body class="document-page">
+    <main>
+      <a href="../">← Volver al simulador</a>
+      <h1>Conectar las gafas</h1>
+      <p>
+        No existe emparejamiento automático por QR. El código solo contiene la
+        dirección del juego: ábrela en el navegador de las gafas.
+      </p>
+      <h2>URL del juego en este servidor</h2>
+      <p><a id="gameURL"></a></p>
+      <div id="qr" aria-label="Código QR con la URL del juego"></div>
+      <p id="pageURL"></p>
+      <h2>Verificador de entorno</h2>
+      <ul id="environment" aria-live="polite">
+        <li>Comprobando…</li>
+      </ul>
+      <button id="check">Volver a comprobar</button>
+      <button id="refresh" hidden>Actualizar caché instalada</button>
+      <p>
+        Espera a «Sin conexión listo» antes de cortar la red. Conserva la misma
+        URL y navegador. Los permisos de XR y passthrough deben probarse en las
+        Quest en modo avión; el sistema puede desalojar la caché.
+      </p>
+      <h2>A · Link público (recomendado)</h2>
+      <ol>
+        <li>Con internet, abre el link público en Meta Quest Browser.</li>
+        <li>Carga el juego y esta página; espera la instalación completa.</li>
+        <li>
+          Inicia una misión y elige VR o MR si aparecen. Luego prueba modo
+          avión.
+        </li>
+      </ol>
+      <h2>B · USB y adb reverse</h2>
+      <p>
+        Requiere modo desarrollador de Quest, depuración USB autorizada y ADB
+        instalado. No se configura desde el juego.
+      </p>
+      <pre>
+python -m http.server 8000 --directory simulador
 adb devices
-adb reverse tcp:8000 tcp:8000</pre><p>En el navegador de las gafas abre <code>http://localhost:8000</code>. Loopback se considera contexto seguro; comprueba WebXR en ese navegador. localhost en las gafas solo llega al computador si el túnel USB está activo. Al desconectar el cable deja de funcionar el túnel.</p><h2>C · Red local HTTPS sin internet</h2><p>Prepara antes del salón un servidor HTTPS en el computador y un certificado cuyo emisor confíen las gafas. Todos los equipos deben estar en la misma red Wi-Fi local, sin aislamiento de clientes. No basta HTTP por IP: WebXR y service workers exigen contexto seguro.</p><p>La <a href="../README.md">guía README</a> contiene comandos con mkcert y el servidor HTTPS incluido. Instalar la CA en las gafas depende de la administración del dispositivo: comprueba confianza real antes de la clase. Si no se puede instalar, usa A o B. No ignores advertencias de certificado.</p><p><a href="../QA-QUEST.md">Lista de pruebas Quest</a> · <a href="../CREDITOS.md">Créditos y licencias</a></p></main><script type="module" src="../connect.js"></script></body></html>
+adb reverse tcp:8000 tcp:8000</pre>
+      <p>
+        En el navegador de las gafas abre <code>http://localhost:8000</code>.
+        Loopback se considera contexto seguro; comprueba WebXR en ese navegador.
+        localhost en las gafas solo llega al computador si el túnel USB está
+        activo. Al desconectar el cable deja de funcionar el túnel.
+      </p>
+      <h2>C · Red local HTTPS sin internet</h2>
+      <p>
+        Prepara antes del salón un servidor HTTPS en el computador y un
+        certificado cuyo emisor confíen las gafas. Todos los equipos deben estar
+        en la misma red Wi-Fi local, sin aislamiento de clientes. No basta HTTP
+        por IP: WebXR y service workers exigen contexto seguro.
+      </p>
+      <p>
+        La <a href="../README.md">guía README</a> contiene comandos con mkcert y
+        el servidor HTTPS incluido. Instalar la CA en las gafas depende de la
+        administración del dispositivo: comprueba confianza real antes de la
+        clase. Si no se puede instalar, usa A o B. No ignores advertencias de
+        certificado.
+      </p>
+      <p>
+        <a href="../QA-QUEST.md">Lista de pruebas Quest</a> ·
+        <a href="../CREDITOS.md">Créditos y licencias</a>
+      </p>
+    </main>
+    <script type="module" src="../connect.js"></script>
+  </body>
+</html>

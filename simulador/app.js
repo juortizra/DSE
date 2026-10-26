@@ -1,5 +1,6 @@
-import {createXR} from "./xr.js";
-import {planRoute} from "./navigation.js";
+import { loadPreferences } from "./preferences.js";
+import { createXR } from "./xr.js";
+import { planRoute } from "./navigation.js";
 import { zipStore, sessionFiles } from "./export.js";
 import { scoreSession } from "./scoring.js";
 import { evaluateAgent, LABELS, DISCLAIMER } from "./agent.js";
@@ -18,10 +19,44 @@ import { photoQuality } from "./quality.js";
 import { createWorld } from "./world.js";
 const $ = (s) => document.querySelector(s),
   canvas = $("#view");
+let prefs;
+try {
+  prefs = loadPreferences(
+    localStorage,
+    matchMedia("(prefers-reduced-motion: reduce)").matches,
+  );
+} catch {
+  prefs = loadPreferences(null, true);
+}
+function applyPrefs() {
+  document.documentElement.style.setProperty("--text-scale", prefs.textScale);
+  document.body.classList.toggle("reduce-motion", prefs.reduceMotion);
+  $("#immersiveView").disabled = prefs.reduceMotion;
+  if (prefs.reduceMotion) $("#immersiveView").checked = false;
+  renderer.setPixelRatio(
+    prefs.lowPower ? 0.65 : Math.min(devicePixelRatio, 1.5),
+  );
+  renderer.shadowMap.enabled = !prefs.lowPower;
+  renderer.shadowMap.needsUpdate = true;
+  if (prefs.reduceMotion) xr?.setImmersive(false);
+  try {
+    localStorage.setItem("dse-preferences", JSON.stringify(prefs));
+  } catch {}
+}
+function soundCaption(t) {
+  if (prefs.subtitles) {
+    $("#audioCaption").textContent = t;
+    clearTimeout(soundCaption.timer);
+    soundCaption.timer = setTimeout(
+      () => ($("#audioCaption").textContent = ""),
+      3500,
+    );
+  }
+}
 const renderer = new T.WebGLRenderer({ canvas, antialias: true });
 renderer.toneMapping = T.ACESFilmicToneMapping;
 renderer.shadowMap.enabled = true;
-renderer.shadowMap.type = T.PCFSoftShadowMap;
+renderer.shadowMap.type = T.PCFShadowMap;
 renderer.shadowMap.autoUpdate = false;
 renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5));
 renderer.setSize(innerWidth, innerHeight);
@@ -167,9 +202,13 @@ function build(l) {
 }
 function menu() {
   stopDemo();
+  xrHome = [];
+  awaitingSD = false;
+  $("#insertSD").hidden = true;
+  xr.exit();
   processingToken++;
   if (humGain) humGain.gain.value = 0;
-  $("#status").textContent = "INSPECCIÓN POSTSISMO · 2G · AGENTE CORREGIDO";
+  $("#status").textContent = "NIVEL 3D · QUEST / OFFLINE";
   active = false;
   paused = false;
   document.exitPointerLock?.();
@@ -188,9 +227,9 @@ function menu() {
         "",
       )}</select></label><label><input type="checkbox" id="replica" ${quakeEnabled ? "checked" : ""}> Réplica sísmica opcional</label></div><p>Primera visita: en la vivienda hay tutorial guiado de ${C.tutorial.seconds} s.</p><div class="home-actions"><button id="play">Jugar</button><button id="demo">Ver demostración</button><button id="about">Acerca del proyecto</button></div><p>Recomendado: Chrome o Edge en computador. En Quest, usa su navegador compatible con WebXR.</p><section id="missions" hidden>${["Vivienda / sector residencial", "Apartamentos / sector urbano", "Edificio / corredor vial"].map((n, i) => `<button data-level="${i}"><small>MISIÓN 0${i + 1}</small><h2>${n}</h2><p>Reconoce el sitio, reúne evidencias y decide.</p><strong>Preparar misión →</strong><p>${progressText(i)}</p></button>`).join("")}</section><p class="note">Análisis sintético educativo, no una IA real. Sin CDN ni transmisión. Ratón y teclado necesarios para pilotar.</p>`;
   $("#panel").onclick = (e) => {
-    if(e.target.closest("#play")) $("#missions").hidden=false;
-    if(e.target.closest("#demo")) beginDemo();
-    if(e.target.closest("#about")) $("#aboutProject").showModal();
+    if (e.target.closest("#play")) $("#missions").hidden = false;
+    if (e.target.closest("#demo")) beginDemo();
+    if (e.target.closest("#about")) $("#aboutProject").showModal();
     const b = e.target.closest("[data-level]");
     if (b) {
       difficultyKey = $("#difficulty").value;
@@ -220,6 +259,9 @@ function briefing(l) {
   };
 }
 function start(l) {
+  agentResult = null;
+  awaitingSD = false;
+  xrHome = [];
   clearKeys();
   $("#pauseBtn").textContent = "Pausa [P]";
   level = l;
@@ -319,7 +361,7 @@ function pause() {
   );
 }
 onkeydown = (e) => {
-  if (e.target instanceof HTMLInputElement) return;
+  if (e.target.closest("input,select,textarea,dialog")) return;
   if (
     ["Space", "ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(
       e.code,
@@ -497,15 +539,27 @@ function quality(exposureLaser = null) {
   };
 }
 function orient(dt) {
-  yaw += (((keys.ArrowLeft ? 1 : 0) - (keys.ArrowRight ? 1 : 0))+(xrInput.yaw||0)*.6) * dt;
+  yaw +=
+    ((keys.ArrowLeft ? 1 : 0) -
+      (keys.ArrowRight ? 1 : 0) +
+      (xrInput.yaw || 0) * 0.6) *
+    dt;
   pitch = T.MathUtils.clamp(
     pitch + ((keys.ArrowUp ? 1 : 0) - (keys.ArrowDown ? 1 : 0)) * dt * 0.6,
     -0.6,
     0.6,
   );
   const local = velocity.clone().applyAxisAngle(up, -yaw);
-  tilt = T.MathUtils.lerp(tilt, -local.z * 0.045, 1 - Math.exp(-dt * 4));
-  bank = T.MathUtils.lerp(bank, -local.x * 0.045, 1 - Math.exp(-dt * 4));
+  tilt = T.MathUtils.lerp(
+    tilt,
+    prefs.reduceMotion ? 0 : -local.z * 0.045,
+    1 - Math.exp(-dt * 4),
+  );
+  bank = T.MathUtils.lerp(
+    bank,
+    prefs.reduceMotion ? 0 : -local.x * 0.045,
+    1 - Math.exp(-dt * 4),
+  );
   rig.rotation.set(0, yaw, 0);
   camera.rotation.set(pitch + tilt, 0, bank);
 }
@@ -527,13 +581,17 @@ function move(dt) {
   }
   orient(dt);
   const v = new T.Vector3(
-    (keys.KeyD ? 1 : 0) - (keys.KeyA ? 1 : 0)+(xrInput.x||0),
-    (keys.KeyE ? 1 : 0) - (keys.KeyQ ? 1 : 0)+(xrInput.alt||0),
-    (keys.KeyS ? 1 : 0) - (keys.KeyW ? 1 : 0)+(xrInput.z||0),
+    (keys.KeyD ? 1 : 0) - (keys.KeyA ? 1 : 0) + (xrInput.x || 0),
+    (keys.KeyE ? 1 : 0) - (keys.KeyQ ? 1 : 0) + (xrInput.alt || 0),
+    (keys.KeyS ? 1 : 0) - (keys.KeyW ? 1 : 0) + (xrInput.z || 0),
   );
   if (v.length() > 1) v.normalize();
   v.applyAxisAngle(up, yaw).multiplyScalar(
-    (xrMode?(xrInput.slow ? .8 : 1.5):C.flight.maxSpeed) *
+    (xrMode
+      ? xrInput.slow
+        ? C.xr.immersiveSpeedMps
+        : C.xr.remoteSpeedMps
+      : C.flight.maxSpeed) *
       (keys.ShiftLeft || keys.ShiftRight ? C.flight.precisionFactor : 1),
   );
   v.x += Math.sin(flightSeconds) * difficulty().windMps;
@@ -680,6 +738,8 @@ function drawMap() {
 }
 let audio;
 function shutter() {
+  soundCaption("[Obturador] Fotografía guardada en SD.");
+  if (prefs.volume === 0) return;
   try {
     audio ??= new AudioContext();
     audio.resume();
@@ -691,7 +751,10 @@ function shutter() {
       C.audio.shutterEndHz,
       audio.currentTime + C.audio.shutterSeconds * 0.8,
     );
-    g.gain.setValueAtTime(C.audio.shutterGain, audio.currentTime);
+    g.gain.setValueAtTime(
+      C.audio.shutterGain * prefs.volume,
+      audio.currentTime,
+    );
     g.gain.exponentialRampToValueAtTime(0.001, audio.currentTime + 0.1);
     o.connect(g);
     g.connect(audio.destination);
@@ -700,7 +763,7 @@ function shutter() {
   } catch {}
   $("#flash").classList.remove("shoot");
   void $("#flash").offsetWidth;
-  $("#flash").classList.add("shoot");
+  if (!prefs.reduceMotion) $("#flash").classList.add("shoot");
 }
 function snapshot() {
   renderer.toneMappingExposure = environment.indoor(rig.position)
@@ -924,7 +987,13 @@ function finish(reason) {
   // XR permanece activo para recuperar e insertar SD y observar el TFT.
   document.exitPointerLock?.();
   $("#hud").hidden = true;
-  if(xrMode==='immersive-ar'){awaitingSD=true;$('#insertSD').hidden=false;toast('SD recuperada: agarra la tarjeta y acércala a la unidad, o pulsa Insertar SD.');}else analyze();
+  if (xrMode === "immersive-ar") {
+    awaitingSD = true;
+    $("#insertSD").hidden = false;
+    toast(
+      "SD recuperada: agarra la tarjeta y acércala a la unidad, o pulsa Insertar SD.",
+    );
+  } else analyze();
 }
 async function analyze() {
   const token = ++processingToken;
@@ -1009,15 +1078,38 @@ function drawCoverage() {
       )
       .join("");
 }
+function verdictMark(i) {
+  if (i === null) return "INDETERMINADO";
+  const shape = [
+    `<circle cx="12" cy="12" r="10"/><path d="m6 12 4 4 8-8" fill="none" stroke="#102027" stroke-width="2"/>`,
+    `<path d="m12 1 11 21H1Z"/>`,
+    `<path d="M7 1h10l6 6v10l-6 6H7l-6-6V7Z"/>`,
+  ][i];
+  return `<svg class="verdict-symbol v${i}" viewBox="0 0 24 24" aria-hidden="true">${shape}</svg> ${LABELS[i]}`;
+}
 function renderGroundSummary() {
   agentResult = evaluateAgent({
     required: points.map((p, i) => i),
     results: groundResults,
   });
   const a = agentResult;
-  if(demoRunning){demoStage="done";demoCaption("Análisis terminado: el agente explica sus reglas. El veredicto es orientativo; no sustituye al evaluador certificado.");setTimeout(()=>{if(!demoRunning)return;decisionRecord={decision:a.verdict,reason:"Demostración: se acepta la sugerencia calculada del agente."};showReport();},300);}
+  drawTFT(photos.length, photos.length);
+  if (demoRunning) {
+    demoStage = "done";
+    demoCaption(
+      "Análisis terminado: el agente explica sus reglas. El veredicto es orientativo; no sustituye al evaluador certificado.",
+    );
+    setTimeout(() => {
+      if (!demoRunning) return;
+      decisionRecord = {
+        decision: a.verdict,
+        reason: "Demostración: se acepta la sugerencia calculada del agente.",
+      };
+      showReport();
+    }, 300);
+  }
   $("#groundSummary").innerHTML =
-    `<h2>Sugerencia: ${a.label}</h2><p>${DISCLAIMER}</p><p>${a.referral}</p>${quakeDone ? "<p>Réplica modelada: se exige repetir la Fase 1. Las fotos previas no cubren checkpoints.</p>" : ""}<p>Cobertura fotográfica ${(a.coverage * 100).toFixed(0)}% · anchos medidos en ${a.measuredPoints}/${points.length} puntos. Las limitaciones ópticas no anulan evidencias estructurales.</p><p>Confianza de cobertura/calidad ${(a.confidence * 100).toFixed(0)}% (no probabilidad de seguridad).</p><ul>${a.rules.map((r) => `<li>${LABELS[r.level]} · ${r.text}</li>`).join("")}</ul>${a.measurementWarnings.length ? "<h3>Limitaciones de medición (no son checkpoints ausentes)</h3><ul>" + a.measurementWarnings.map((t) => "<li>" + t + "</li>").join("") + "</ul>" : ""}${a.missing.length ? "<h3>Qué falta</h3><ul>" + a.missing.map((t) => "<li>" + t + "</li>").join("") + '</ul><button id="secondSortie">Segunda salida · batería nueva y conservar fotos</button>' : ""}${!a.missing.length && a.measurementWarnings.length ? '<button id="secondSortie">Mejorar medidas · segunda salida opcional</button>' : ""}<h3>No evaluable con este sistema</h3><ul>${a.notEvaluable.map((t) => "<li>" + t + "</li>").join("")}</ul>${a.verdict === null ? '<button id="partialReport">Ver informe parcial (INDETERMINADO)</button>' : ""}<div class="choices">${LABELS.map((v, i) => `<button data-verdict="${i}" ${a.verdict === null ? "disabled" : ""}>${v}</button>`).join("")}</div><label>Si discrepas del agente, elige una razón: <select id="disagreeReason"><option value="">Seleccionar…</option>${C.disagreementReasons.map((r, i) => `<option value="${i}">${r}</option>`).join("")}</select></label><div id="result"></div><button id="again">Volver a misiones</button>`;
+    `<h2>Sugerencia: ${verdictMark(a.verdict)}</h2><p>${DISCLAIMER}</p><p>${a.referral}</p>${quakeDone ? "<p>Réplica modelada: se exige repetir la Fase 1. Las fotos previas no cubren checkpoints.</p>" : ""}<p>Cobertura fotográfica ${(a.coverage * 100).toFixed(0)}% · anchos medidos en ${a.measuredPoints}/${points.length} puntos. Las limitaciones ópticas no anulan evidencias estructurales.</p><p>Confianza de cobertura/calidad ${(a.confidence * 100).toFixed(0)}% (no probabilidad de seguridad).</p><ul>${a.rules.map((r) => `<li>${verdictMark(r.level)} · ${r.text}</li>`).join("")}</ul>${a.measurementWarnings.length ? "<h3>Limitaciones de medición (no son checkpoints ausentes)</h3><ul>" + a.measurementWarnings.map((t) => "<li>" + t + "</li>").join("") + "</ul>" : ""}${a.missing.length ? "<h3>Qué falta</h3><ul>" + a.missing.map((t) => "<li>" + t + "</li>").join("") + '</ul><button id="secondSortie">Segunda salida · batería nueva y conservar fotos</button>' : ""}${!a.missing.length && a.measurementWarnings.length ? '<button id="secondSortie">Mejorar medidas · segunda salida opcional</button>' : ""}<h3>No evaluable con este sistema</h3><ul>${a.notEvaluable.map((t) => "<li>" + t + "</li>").join("")}</ul>${a.verdict === null ? '<button id="partialReport">Ver informe parcial (INDETERMINADO)</button>' : ""}<div class="choices">${LABELS.map((v, i) => `<button data-verdict="${i}" ${a.verdict === null ? "disabled" : ""}>${verdictMark(i)}</button>`).join("")}</div><label>Si discrepas del agente, elige una razón: <select id="disagreeReason"><option value="">Seleccionar…</option>${C.disagreementReasons.map((r, i) => `<option value="${i}">${r}</option>`).join("")}</select></label><div id="result"></div><button id="again">Volver a misiones</button>`;
   $("#again").onclick = menu;
   $("#partialReport")?.addEventListener("click", () => {
     decisionRecord = {
@@ -1062,47 +1154,313 @@ $("#capture").onclick = capture;
 $("#land").onclick = land;
 $("#returnBtn").onclick = returnToBase;
 $("#pauseBtn").onclick = pause;
-let xrInput={},xrHome=[],awaitingSD=false,xrFocusPaused=false;
-const xr=createXR(T,renderer,scene,camera,{
- world:()=>world,position:()=>rig.position,mode:m=>{xrMode=m;},input:v=>{xrInput=v;},clear:clearKeys,message:toast,photo:capture,
- focus:visible=>{if(!visible){xrFocusPaused=paused;paused=true;velocity.set(0,0,0);}else paused=xrFocusPaused;},
- home:()=>{try{xrHome=planRoute(T,rig.position,environment.base.clone().setY(.5),bounds,environment.height+5);toast('Regreso automático por ruta libre.');}catch(e){toast(e.message);}},
- crashed:()=>stats.crashes>0,awaitingSD:()=>awaitingSD,insert:()=>{if(!awaitingSD){toast('Primero aterriza en H para recuperar la SD.');return;}awaitingSD=false;$('#insertSD').hidden=true;analyze();}
+let xrInput = {},
+  xrHome = [],
+  awaitingSD = false,
+  xrFocusPaused = false;
+const xr = createXR(T, renderer, scene, camera, {
+  allowImmersive: () => !prefs.reduceMotion,
+  hud: () => [
+    `${returning ? "REGRESO A H" : `Punto ${chosen + 1}/7: ${point()?.name || ""}`} · Luz ${lightOn ? "ON" : "OFF"}`,
+    `Batería ${battery.toFixed(0)}% · Láser ${sensorCache?.laser.valid ? sensorCache.laser.mm.toFixed(0) + " mm" : "sin lectura"} · Altura ${rig.position.y.toFixed(1)} m · Fotos ${photos.length}`,
+    $("#message").textContent,
+  ],
+  world: () => world,
+  position: () => rig.position,
+  mode: (m) => {
+    xrMode = m;
+    if (m) {
+      lightOn = true;
+      lamp.intensity = 12;
+    }
+    if (!m && awaitingSD) {
+      awaitingSD = false;
+      $("#insertSD").hidden = true;
+      analyze();
+    }
+  },
+  input: (v) => {
+    xrInput = v;
+  },
+  clear: clearKeys,
+  message: toast,
+  photo: capture,
+  focus: (visible) => {
+    if (!visible) {
+      xrFocusPaused = paused;
+      paused = true;
+      velocity.set(0, 0, 0);
+    } else paused = xrFocusPaused;
+  },
+  home: () => {
+    try {
+      xrHome = planRoute(
+        T,
+        rig.position,
+        environment.base.clone().setY(0.5),
+        bounds,
+        environment.height + 5,
+      );
+      toast("Regreso automático por ruta libre.");
+    } catch (e) {
+      toast(e.message);
+    }
+  },
+  crashed: () => stats.crashes > 0,
+  flying: () => active,
+  review: () => agentResult,
+  confirm: () => {
+    if (!agentResult) return;
+    const b =
+      agentResult.verdict === null
+        ? $("#partialReport")
+        : $("[data-verdict='" + agentResult.verdict + "']");
+    b?.click();
+  },
+  awaitingSD: () => awaitingSD,
+  insert: () => {
+    if (!awaitingSD) {
+      toast("Primero aterriza en H para recuperar la SD.");
+      return;
+    }
+    awaitingSD = false;
+    $("#insertSD").hidden = true;
+    analyze();
+  },
 });
-$('#xr').onclick=()=>xr.enter('immersive-vr');$('#mr').onclick=()=>xr.enter('immersive-ar');$('#exitXR').onclick=()=>xr.exit();$('#insertSD').onclick=()=>{if(awaitingSD){awaitingSD=false;$('#insertSD').hidden=true;analyze();}};
-$('#immersiveView').onchange=e=>xr.setImmersive(e.target.checked);xr.supported();
-let demoRunning=false, demoStage="", demoRoute=[], demoIndex=0, demoWait=0, demoBusy=false, demoElapsed=0;
-function progressText(i){try{const p=JSON.parse(localStorage.getItem('dse-progress')||'{}')[i];return p?`${p.completed?'✓ Completado':'En progreso'} · mejor ${p.best}/100`:'Sin completar';}catch{return 'Progreso local no disponible';}}
-function saveProgress(i,score,completed){if(demoRunning)return;try{const p=JSON.parse(localStorage.getItem('dse-progress')||'{}');p[i]={best:Math.max(score,p[i]?.best||0),completed:completed||p[i]?.completed||false};localStorage.setItem('dse-progress',JSON.stringify(p));}catch{toast('No se pudo guardar el progreso local.');}}
-function demoCaption(text){$('#demoCaption').textContent=text;}
-function stopDemo(){demoRunning=false;$('#demoBar').hidden=true;}
-function demoTravel(target){demoRoute=planRoute(T,rig.position,target,bounds,environment.height+5);demoWait=0;}
-function beginDemo(){
- stopDemo();difficultyKey='aprendiz';quakeEnabled=false;resumeSortie=false;start(1);calibrated=true;lightOn=true;lamp.intensity=12;demoRunning=true;demoStage='takeoff';demoIndex=0;demoElapsed=0;demoBusy=false;$('#demoBar').hidden=false;
- demoCaption('Despegue. El módulo funciona con batería y almacena sensores e imágenes en la SD; no transmite análisis.');
- try{demoTravel(rig.position.clone().setY(2));}catch(e){stopDemo();toast(e.message);}
+$("#xr").onclick = () => xr.enter("immersive-vr");
+$("#mr").onclick = () => xr.enter("immersive-ar");
+$("#exitXR").onclick = () => xr.exit();
+$("#insertSD").onclick = () => {
+  if (awaitingSD) {
+    awaitingSD = false;
+    $("#insertSD").hidden = true;
+    analyze();
+  }
+};
+$("#immersiveView").onchange = (e) => xr.setImmersive(e.target.checked);
+xr.supported();
+let demoRunning = false,
+  demoStage = "",
+  demoRoute = [],
+  demoIndex = 0,
+  demoWait = 0,
+  demoBusy = false,
+  demoElapsed = 0;
+function progressText(i) {
+  try {
+    const p = JSON.parse(localStorage.getItem("dse-progress") || "{}")[i];
+    return p
+      ? `${p.completed ? "✓ Completado" : "En progreso"} · mejor ${p.best}/100`
+      : "Sin completar";
+  } catch {
+    return "Progreso local no disponible";
+  }
 }
-async function demoFrame(dt){
- demoElapsed+=dt;flightSeconds+=dt;tickSensors(dt);battery=Math.max(0,battery-batteryDrain(dt,velocity.length(),lightOn,1));
- if(demoBusy)return;
- if(demoRoute.length){const target=demoRoute[0],d=target.clone().sub(rig.position),travel=Math.min(d.length(),1.8*dt);velocity.copy(d).normalize().multiplyScalar(1.8);rig.position.addScaledVector(d.normalize(),travel);if(rig.position.distanceTo(target)<.01)demoRoute.shift();if(d.length()>.01){yaw=Math.atan2(-d.x,-d.z);pitch=0;orient(dt);}return;}
- velocity.set(0,0,0);demoWait+=dt;
- try{
- if(demoStage==='takeoff'&&demoWait>6){demoStage='points';demoWait=0;demoTravel(points[0].position.clone().addScaledVector(points[0].normal,.45+C.camera.offsetM));}
- else if(demoStage==='points'){
- chosen=demoIndex;const p=point();yaw=Math.atan2(p.normal.x,p.normal.z);pitch=bank=tilt=0;rig.rotation.set(0,yaw,0);camera.rotation.set(0,0,0);
- demoCaption(`Checkpoint ${demoIndex+1}/7: estabilización, iluminación, foto y lectura simultánea de cámara, láser e IMU. Todo queda en la SD.`);
- if(demoWait>5){demoBusy=true;await capture();demoBusy=false;if(!demoRunning)return;if(!p.best){demoWait=3;return;}demoIndex++;if(demoIndex<points.length){demoTravel(points[demoIndex].position.clone().addScaledVector(points[demoIndex].normal,.45+C.camera.offsetM));}else{demoStage='return';demoTravel(environment.base.clone().setY(.5));demoCaption('Regreso a la base: no hay inferencia durante el vuelo. La unidad de tierra recibirá la tarjeta SD.');}}
- }else if(demoStage==='return'&&demoWait>Math.max(4,120-demoElapsed)){demoStage='analysis';demoCaption('Aterrizaje e inserción de SD. La unidad de tierra simula IA liviana, mide con incertidumbre y aplica reglas; el evaluador conserva la decisión oficial.');land();}
- }catch(e){stopDemo();toast(e.message);}
+function saveProgress(i, score, completed) {
+  if (demoRunning) return;
+  try {
+    const p = JSON.parse(localStorage.getItem("dse-progress") || "{}");
+    p[i] = {
+      best: Math.max(score, p[i]?.best || 0),
+      completed: completed || p[i]?.completed || false,
+    };
+    localStorage.setItem("dse-progress", JSON.stringify(p));
+  } catch {
+    toast("No se pudo guardar el progreso local.");
+  }
 }
-$('#takeControl').onclick=()=>{stopDemo();velocity.set(0,0,0);clearKeys();toast('Ahora controlas el dron.');};
+function demoCaption(text) {
+  $("#demoCaption").textContent = text;
+}
+function stopDemo() {
+  demoRunning = false;
+  $("#demoBar").hidden = true;
+}
+function demoTravel(target) {
+  demoRoute = planRoute(
+    T,
+    rig.position,
+    target,
+    bounds,
+    environment.height + 5,
+  );
+  demoWait = 0;
+}
+function beginDemo() {
+  stopDemo();
+  difficultyKey = "aprendiz";
+  quakeEnabled = false;
+  resumeSortie = false;
+  start(1);
+  calibrated = true;
+  lightOn = true;
+  lamp.intensity = 12;
+  demoRunning = true;
+  demoStage = "takeoff";
+  demoIndex = 0;
+  demoElapsed = 0;
+  demoBusy = false;
+  $("#demoBar").hidden = false;
+  demoCaption(
+    "Despegue. El módulo funciona con batería y almacena sensores e imágenes en la SD; no transmite análisis.",
+  );
+  try {
+    demoTravel(rig.position.clone().setY(2));
+  } catch (e) {
+    stopDemo();
+    toast(e.message);
+  }
+}
+async function demoFrame(dt) {
+  demoElapsed += dt;
+  flightSeconds += dt;
+  tickSensors(dt);
+  battery = Math.max(
+    0,
+    battery - batteryDrain(dt, velocity.length(), lightOn, 1),
+  );
+  if (demoBusy) return;
+  if (demoRoute.length) {
+    const target = demoRoute[0],
+      d = target.clone().sub(rig.position),
+      travel = Math.min(d.length(), C.demo.speedMps * dt);
+    velocity.copy(d).normalize().multiplyScalar(C.demo.speedMps);
+    rig.position.addScaledVector(d.normalize(), travel);
+    if (rig.position.distanceTo(target) < 0.01) demoRoute.shift();
+    if (d.length() > 0.01) {
+      yaw = Math.atan2(-d.x, -d.z);
+      pitch = 0;
+      orient(dt);
+    }
+    return;
+  }
+  velocity.set(0, 0, 0);
+  demoWait += dt;
+  try {
+    if (demoStage === "takeoff" && demoWait > 6) {
+      demoStage = "points";
+      demoWait = 0;
+      demoTravel(
+        points[0].position
+          .clone()
+          .addScaledVector(points[0].normal, 0.45 + C.camera.offsetM),
+      );
+    } else if (demoStage === "points") {
+      chosen = demoIndex;
+      const p = point();
+      yaw = Math.atan2(p.normal.x, p.normal.z);
+      pitch = bank = tilt = 0;
+      rig.rotation.set(0, yaw, 0);
+      camera.rotation.set(0, 0, 0);
+      demoCaption(
+        `Checkpoint ${demoIndex + 1}/7: estabilización, iluminación, foto y lectura simultánea de cámara, láser e IMU. Todo queda en la SD.`,
+      );
+      if (demoWait > C.demo.hoverSeconds) {
+        demoBusy = true;
+        await capture();
+        demoBusy = false;
+        if (!demoRunning) return;
+        if (!p.best) {
+          demoWait = 3;
+          return;
+        }
+        demoIndex++;
+        if (demoIndex < points.length) {
+          demoTravel(
+            points[demoIndex].position
+              .clone()
+              .addScaledVector(
+                points[demoIndex].normal,
+                0.45 + C.camera.offsetM,
+              ),
+          );
+        } else {
+          demoStage = "return";
+          demoTravel(environment.base.clone().setY(0.5));
+          demoCaption(
+            "Regreso a la base: no hay inferencia durante el vuelo. La unidad de tierra recibirá la tarjeta SD.",
+          );
+        }
+      }
+    } else if (
+      demoStage === "return" &&
+      demoWait > Math.max(4, C.demo.minFlightSeconds - demoElapsed)
+    ) {
+      demoStage = "analysis";
+      demoCaption(
+        "Aterrizaje e inserción de SD. La unidad de tierra simula IA liviana, mide con incertidumbre y aplica reglas; el evaluador conserva la decisión oficial.",
+      );
+      land();
+    }
+  } catch (e) {
+    stopDemo();
+    toast(e.message);
+  }
+}
+$("#takeControl").onclick = () => {
+  stopDemo();
+  velocity.set(0, 0, 0);
+  clearKeys();
+  toast("Ahora controlas el dron.");
+};
+for (const [id, key] of [
+  ["volume", "volume"],
+  ["textSize", "textScale"],
+  ["reduceMotion", "reduceMotion"],
+  ["soundSubtitles", "subtitles"],
+  ["lowPower", "lowPower"],
+]) {
+  const el = $("#" + id);
+  if (el.type === "checkbox") el.checked = prefs[key];
+  else el.value = prefs[key];
+  el.oninput = () => {
+    prefs[key] = el.type === "checkbox" ? el.checked : Number(el.value);
+    applyPrefs();
+  };
+}
+applyPrefs();
+let beforeControls = false;
+$("#controlsBtn").onclick = () => {
+  beforeControls = paused;
+  if (active) {
+    paused = true;
+    clearKeys();
+    velocity.set(0, 0, 0);
+  }
+  $("#controlsDialog").showModal();
+};
+$("#controlsDialog").addEventListener("close", () => {
+  if (active) paused = beforeControls;
+});
 let hudClock = 0;
 renderer.setAnimationLoop((t, frame) => {
-  const dt = Math.min((t - last) / 1000 || 0, C.flight.dtMax);
+  const dt = Math.min(
+    (t - last) / 1000 || 0,
+    demoRunning ? C.demo.dtMax : C.flight.dtMax,
+  );
   last = t;
   if (active && !paused) {
-    if(demoRunning) demoFrame(dt); else if(xrHome.length){const d=xrHome[0].clone().sub(rig.position);rig.position.addScaledVector(d.clone().normalize(),Math.min(d.length(),dt));velocity.copy(d).normalize();tickSensors(dt);flightSeconds+=dt;battery=Math.max(0,battery-batteryDrain(dt,1,lightOn,1));if(d.length()<.02)xrHome.shift();if(!xrHome.length){velocity.set(0,0,0);land();}} else move(dt);
+    if (demoRunning) demoFrame(dt);
+    else if (xrHome.length && battery > 0) {
+      const d = xrHome[0].clone().sub(rig.position);
+      rig.position.addScaledVector(
+        d.clone().normalize(),
+        Math.min(d.length(), dt),
+      );
+      velocity.copy(d).normalize();
+      tickSensors(dt);
+      flightSeconds += dt;
+      battery = Math.max(0, battery - batteryDrain(dt, 1, lightOn, 1));
+      if (d.length() < 0.02) xrHome.shift();
+      if (!xrHome.length) {
+        velocity.set(0, 0, 0);
+        land();
+      }
+    } else {
+      xrHome = [];
+      move(dt);
+    }
     extras(dt);
     hudClock += dt;
     if (hudClock > 0.12) {
@@ -1110,15 +1468,17 @@ renderer.setAnimationLoop((t, frame) => {
       hudClock = 0;
     }
   }
+  $("#motorCaption").hidden = !active || !prefs.subtitles;
   if (environment.decorations)
     environment.decorations.forEach(
-      (o, i) => (o.visible = Math.sin(t * 0.023 + i * 2) > 0),
+      (o, i) =>
+        (o.visible = prefs.reduceMotion || Math.sin(t * 0.023 + i * 2) > 0),
     );
   if (humGain) {
-    humGain.gain.value = active && !paused ? C.audio.gain : 0;
+    humGain.gain.value = active && !paused ? C.audio.gain * prefs.volume : 0;
     hum.frequency.value = C.audio.humHz + velocity.length() * C.audio.speedHz;
   }
-  if(!xr.frame(dt,frame)) renderer.render(scene, camera);
+  if (!xr.frame(dt, frame)) renderer.render(scene, camera);
 });
 onresize = () => {
   camera.aspect = innerWidth / innerHeight;
@@ -1238,7 +1598,11 @@ function showReport() {
       goodCount: accepted(),
     });
   decisionRecord.score = score;
-  saveProgress(level,score.total,agentResult.coverage===1 && decisionRecord.decision!==null);
+  saveProgress(
+    level,
+    score.total,
+    agentResult.coverage === 1 && decisionRecord.decision !== null,
+  );
   $("#result").innerHTML =
     `<h2>${decisionRecord.decision === null ? "Informe parcial: INDETERMINADO" : score.critical ? "ERROR CRÍTICO: rojo clasificado como verde" : decisionRecord.decision === expected ? "Decisión acertada" : "Decisión distinta al escenario"}</h2><p>Tu decisión: ${LABELS[decisionRecord.decision] ?? "INDETERMINADO"} · escenario: ${LABELS[expected]} · agente: ${agentResult.label}.</p><p>${decisionRecord.reason}</p><h3>Puntaje ${score.total}/100</h3><p>Decisión ${score.decision}/${C.score.decision} · fotos ${score.photography.toFixed(1)}/${C.score.photo} · eficiencia ${score.efficiency.toFixed(1)}/${C.score.efficiency} · seguridad ${score.safety.toFixed(1)}/${C.score.safety}</p><p>${C.scenarios[level].collapse ? "Colapso modelado: no ingresar." : cases[level].explanation}</p><p>${DISCLAIMER}</p><h3>Informe: verdad de terreno revelada</h3><div class="report-table">${photos
       .map((p) => {
@@ -1277,18 +1641,20 @@ function initHum() {
       hum.type = "sawtooth";
       hum.connect(humGain);
       humGain.connect(audio.destination);
-      humGain.gain.value = C.audio.gain;
+      humGain.gain.value = C.audio.gain * prefs.volume;
       hum.start();
     }
   } catch {}
 }
 function alertTone() {
+  soundCaption("[Alarma] Atención: revisa el aviso de batería o réplica.");
+  if (prefs.volume === 0) return;
   try {
     initHum();
     const o = audio.createOscillator(),
       g = audio.createGain();
     o.frequency.value = C.audio.alertHz;
-    g.gain.setValueAtTime(C.audio.alertGain, audio.currentTime);
+    g.gain.setValueAtTime(C.audio.alertGain * prefs.volume, audio.currentTime);
     g.gain.exponentialRampToValueAtTime(
       0.001,
       audio.currentTime + C.audio.alertSeconds,
@@ -1361,7 +1727,9 @@ function extras(dt) {
   if (quakeLeft > 0) {
     quakeLeft -= dt;
     camera.rotation.z +=
-      Math.sin(flightSeconds * C.quake.shakeHz) * C.quake.shakeRad;
+      (prefs.reduceMotion ? 0 : 1) *
+      Math.sin(flightSeconds * C.quake.shakeHz) *
+      C.quake.shakeRad;
     lastImpact = performance.now();
   }
   for (const m of fallingDebris)

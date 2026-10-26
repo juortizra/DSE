@@ -6,7 +6,7 @@ body {
   background: #101e25;
   color: #edf3ed;
   font:
-    15px system-ui,
+    1rem system-ui,
     sans-serif;
 }
 canvas#view {
@@ -27,13 +27,13 @@ header {
   z-index: 2;
 }
 header b {
-  font-size: 24px;
+  font-size: 1.6rem;
 }
 header span,
 small,
 .eyebrow,
 .steps {
-  font-size: 11px;
+  font-size: 0.7333rem;
   letter-spacing: 2px;
 }
 header span {
@@ -66,7 +66,7 @@ main {
   border-radius: 12px;
 }
 h1 {
-  font-size: clamp(32px, 5vw, 62px);
+  font-size: clamp(2.1333rem, 5vw, 4.1333rem);
   line-height: 1.08;
   letter-spacing: -2px;
   margin: 22px 0;
@@ -95,15 +95,15 @@ em {
   background: #1a3339;
 }
 h2 {
-  font-size: 19px;
+  font-size: 1.2667rem;
 }
 #missions p {
   color: #aac0bc;
-  font-size: 13px;
+  font-size: 0.8667rem;
 }
 strong {
   color: #c4f37a;
-  font-size: 13px;
+  font-size: 0.8667rem;
 }
 i {
   display: block;
@@ -127,7 +127,7 @@ i {
 }
 .note {
   color: #a5b8b6;
-  font-size: 12px;
+  font-size: 0.8rem;
   line-height: 1.6;
 }
 footer {
@@ -137,7 +137,7 @@ footer {
   width: 100%;
   text-align: center;
   padding: 12px;
-  font-size: 12px;
+  font-size: 0.8rem;
   color: #d9e5c5;
   z-index: 3;
 }
@@ -167,7 +167,7 @@ aside {
   top: 50%;
   left: 50%;
   color: #c4f37a;
-  font-size: 28px;
+  font-size: 1.8667rem;
 }
 #message {
   position: fixed;
@@ -192,7 +192,7 @@ nav {
   bottom: 52px;
   width: 100%;
   text-align: center;
-  font-size: 12px;
+  font-size: 0.8rem;
 }
 #panel.analysis {
   max-width: 1100px;
@@ -212,7 +212,7 @@ article img {
   border-radius: 4px;
 }
 article p {
-  font-size: 13px;
+  font-size: 0.8667rem;
   line-height: 1.6;
 }
 .choices {
@@ -252,11 +252,11 @@ article p {
     max-width: 240px;
   }
   .keys {
-    font-size: 10px;
+    font-size: 0.6667rem;
   }
   nav button {
     padding: 10px;
-    font-size: 12px;
+    font-size: 0.8rem;
   }
 }
 .photo-frame {
@@ -276,7 +276,7 @@ article p {
   background: #10232ae6;
   color: #c4f37a;
   padding: 4px;
-  font-size: 10px;
+  font-size: 0.6667rem;
 }
 body {
   overflow-x: hidden;
@@ -288,7 +288,7 @@ body {
   overflow: auto;
 }
 #target p {
-  font-size: 13px;
+  font-size: 0.8667rem;
   line-height: 1.6;
 }
 #message {
@@ -296,11 +296,11 @@ body {
   bottom: 165px;
   max-height: 110px;
   overflow: auto;
-  font-size: 13px;
+  font-size: 0.8667rem;
 }
 #cross {
   transform: translate(-50%, -50%);
-  font-size: 32px;
+  font-size: 2.1333rem;
   text-shadow: 0 0 3px #000;
 }
 #thumbnail {
@@ -325,7 +325,7 @@ body {
   gap: 4px;
 }
 .checkpoint-list button {
-  font-size: 11px;
+  font-size: 0.7333rem;
   padding: 6px;
 }
 .checkpoint-list .selected {
@@ -391,7 +391,7 @@ nav {
 }
 nav button {
   padding: 10px;
-  font-size: 13px;
+  font-size: 0.8667rem;
 }
 .briefing-list {
   line-height: 2;
@@ -400,7 +400,7 @@ nav button {
   padding-bottom: 40px;
 }
 footer {
-  font-size: 12px;
+  font-size: 0.8rem;
 }
 @media (max-width: 850px) {
   #map {
@@ -415,10 +415,10 @@ footer {
     top: 88px;
     left: 8px;
     padding: 10px;
-    font-size: 11px;
+    font-size: 0.7333rem;
   }
   #metrics {
-    font-size: 12px;
+    font-size: 0.8rem;
   }
   #thumbnail {
     width: 90px;
@@ -431,7 +431,7 @@ footer {
   .keys {
     bottom: 43px;
     padding: 0 15px;
-    font-size: 10px;
+    font-size: 0.6667rem;
   }
   nav {
     bottom: 84px;
@@ -448,7 +448,7 @@ footer {
   background: #1a3339;
   padding: 20px;
   margin: 20px 0;
-  font-size: 13px;
+  font-size: 0.8667rem;
 }
 .briefing-list {
   padding-left: 24px;
@@ -472,7 +472,7 @@ footer {
   z-index: 12;
 }
 .analysis h1 {
-  font-size: 44px;
+  font-size: 2.9333rem;
 }
 #tft {
   display: block;
@@ -518,7 +518,7 @@ footer {
   padding: 12px;
   background: #163c31ef;
   border: 1px solid #bce685;
-  font-size: 12px;
+  font-size: 0.8rem;
   z-index: 2;
 }
 select {
@@ -534,14 +534,172 @@ select {
   gap: 12px;
 }
 .report-table article {
-  font-size: 13px;
+  font-size: 0.8667rem;
   line-height: 1.6;
 }
 #galleryBtn {
   opacity: 0.65;
 }
 
-[hidden]{display:none!important} .home-actions{display:flex;gap:1rem;flex-wrap:wrap}.diagram{padding:1rem;border:1px solid #a8d7b2}dialog{max-width:min(820px,90vw);max-height:85vh;overflow:auto;background:#172a30;color:#edf5ef;border:1px solid #a8d7b2}#demoBar{position:fixed;bottom:35px;left:5%;width:90%;z-index:20;background:#10262ef2;padding:12px;border:1px solid #c4f37a}#demoBar p{margin:0 0 8px}header{z-index:30}button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid #f5cf72;outline-offset:3px}
+[hidden] {
+  display: none !important;
+}
+.home-actions {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+.diagram {
+  padding: 1rem;
+  border: 1px solid #a8d7b2;
+}
+dialog {
+  max-width: min(820px, 90vw);
+  max-height: 85vh;
+  overflow: auto;
+  background: #172a30;
+  color: #edf5ef;
+  border: 1px solid #a8d7b2;
+}
+#demoBar {
+  position: fixed;
+  bottom: 35px;
+  left: 5%;
+  width: 90%;
+  z-index: 20;
+  background: #10262ef2;
+  padding: 12px;
+  border: 1px solid #c4f37a;
+}
+#demoBar p {
+  margin: 0 0 8px;
+}
+header {
+  z-index: 30;
+}
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible {
+  outline: 3px solid #f5cf72;
+  outline-offset: 3px;
+}
 
-#xrTools{position:fixed;right:12px;top:80px;z-index:31;background:#14242bdd;font-size:.85rem}
-.document-page{overflow:auto;background:#102027;color:#e7f4ec}.document-page main{position:relative;max-width:900px;margin:2rem auto;padding:1.5rem}.document-page #qr{width:min(300px,90%);background:white}.document-page #qr svg{display:block;width:100%}a{color:#c4f37a}pre{white-space:pre-wrap;overflow-wrap:anywhere}
+#xrTools {
+  position: fixed;
+  right: 12px;
+  top: 80px;
+  z-index: 31;
+  background: #14242bdd;
+  font-size: 0.85rem;
+}
+.document-page {
+  overflow: auto;
+  background: #102027;
+  color: #e7f4ec;
+}
+.document-page main {
+  position: relative;
+  max-width: 900px;
+  margin: 2rem auto;
+  padding: 1.5rem;
+}
+.document-page #qr {
+  width: min(300px, 90%);
+  background: white;
+}
+.document-page #qr svg {
+  display: block;
+  width: 100%;
+}
+a {
+  color: #c4f37a;
+}
+pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+html {
+  font-size: calc(15px * var(--text-scale, 1));
+}
+header {
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 12px 24px;
+}
+header a {
+  font-size: 0.85rem;
+}
+#panel {
+  margin-top: 110px;
+}
+fieldset label {
+  display: block;
+  margin: 0.7rem 0;
+}
+.reduce-motion * {
+  animation: none !important;
+  scroll-behavior: auto !important;
+}
+.verdict-symbol {
+  width: 1.4em;
+  height: 1.4em;
+  vertical-align: middle;
+  stroke: currentColor;
+  stroke-width: 1;
+}
+.v0 {
+  fill: #90d99b;
+}
+.v1 {
+  fill: #f8d46c;
+}
+.v2 {
+  fill: #f28e85;
+}
+#audioCaption {
+  position: fixed;
+  bottom: 75px;
+  left: 30%;
+  z-index: 40;
+  background: #102027ed;
+  padding: 8px;
+  pointer-events: none;
+}
+#audioCaption:empty {
+  display: none;
+}
+button,
+input,
+select {
+  min-height: 36px;
+}
+body.document-page main {
+  margin-top: 1rem;
+}
+@media (max-width: 800px) {
+  header span,
+  header #status {
+    display: none;
+  }
+  #panel {
+    margin-top: 125px;
+  }
+  header {
+    padding: 8px;
+  }
+  header b {
+    font-size: 1.2rem;
+  }
+}
+
+#motorCaption {
+  position: fixed;
+  bottom: 30px;
+  right: 15px;
+  z-index: 15;
+  padding: 5px;
+  background: #102027eb;
+  font-size: 0.8rem;
+  max-width: 320px;
+}

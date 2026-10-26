@@ -1,4 +1,4 @@
-const CACHE = "dse-3c-v1";
+const CACHE = "dse-3d-v1";
 const FILES = [
   "./",
   "./index.html",
@@ -6,6 +6,8 @@ const FILES = [
   "./app.js",
   "./navigation.js",
   "./xr.js",
+  "./preferences.js",
+  "./CREDITOS.md",
   "./conectar/index.html",
   "./connect.js",
   "./vendor/qrcode.mjs",
@@ -55,5 +57,21 @@ self.addEventListener("fetch", (e) => {
     new URL(e.request.url).origin !== self.location.origin
   )
     return;
-  e.respondWith(caches.match(e.request, {ignoreSearch:true}).then(async (r) => {if(r)return r;const u=new URL(e.request.url);if(u.pathname.endsWith("/conectar"))return (await caches.match(new URL("./conectar/index.html",self.location.href))) || fetch(e.request);return fetch(e.request);}));
+  e.respondWith(
+    caches.match(e.request, { ignoreSearch: true }).then(async (r) => {
+      if (r) return r;
+      const u = new URL(e.request.url);
+      if (u.pathname.endsWith("/conectar")) {
+        u.pathname += "/";
+        return Response.redirect(u.href, 302);
+      }
+      if (u.pathname.endsWith("/")) {
+        const page = await caches.match(new URL("index.html", u), {
+          ignoreSearch: true,
+        });
+        if (page) return page;
+      }
+      return fetch(e.request);
+    }),
+  );
 });

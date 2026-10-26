@@ -5,14 +5,17 @@
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <meta name="theme-color" content="#101e25" />
     <title>DSE · Misión estructural</title>
-    <link rel="icon" href="icon.svg" /><link rel="stylesheet" href="style.css" />
+    <link rel="icon" href="icon.svg" />
+    <link rel="stylesheet" href="style.css" />
   </head>
   <body>
     <canvas id="view" aria-label="Cámara del dron"></canvas>
     <header>
       <b>◈ DSE <span>LABORATORIO DE CAMPO</span></b>
       <div id="status">INSPECCIÓN POSTSISMO</div>
-      <a href="conectar/">Conectar Quest / offline</a><button id="controlsBtn">Controles</button><button id="menuBtn">Misiones</button>
+      <a href="conectar/">Conectar Quest / offline</a
+      ><button id="controlsBtn">Controles</button
+      ><button id="menuBtn">Misiones</button>
     </header>
     <div id="hud" hidden>
       <aside>
@@ -34,7 +37,8 @@
         ><button id="returnBtn">Base [B]</button
         ><button id="land">Aterrizar [L]</button
         ><button id="pauseBtn">Pausa [P]</button
-        ><button id="xr" hidden>Entrar en VR</button><button id="mr" hidden>Entrar en MR</button>
+        ><button id="xr" hidden>Entrar en VR</button
+        ><button id="mr" hidden>Entrar en MR</button>
       </nav>
       <div class="keys">
         W/S avanzar/retroceder · A/D lateral · Q/E bajar/subir · ratón / ←→
@@ -56,17 +60,130 @@
       <p id="fullCaption"></p>
       <img id="fullPhoto" alt="Fotografía renderizada ampliada" />
     </dialog>
-    <div id="xrTools"><span id="xrStatus"></span><button id="exitXR" hidden>Salir de XR</button><button id="insertSD" hidden>Insertar SD</button></div><aside id="demoBar" hidden><p id="demoCaption" role="status" aria-live="polite"></p><button id="takeControl">Interrumpir / tomar el control</button></aside>
-    <dialog id="controlsDialog"><h2>Controles y comodidad</h2><label><input type="checkbox" id="immersiveView"> Vista inmersiva VR (opcional, modo sentado; velocidad reducida). Por defecto: monitor FPV estable.</label><p>Quest: stick izquierdo altura/giro; derecho desplazamiento; gatillo foto; A/X regreso a base; B/Y cambiar vista o colocar maqueta MR. Agarre mueve la maqueta; ambos agarres escalan. Tras aterrizar en MR: agarrar SD y soltar junto a unidad, o gatillo/botón Insertar SD.</p><p>W/S avanzar · A/D lateral · Q/E altura · flechas o ratón orientar · Shift precisión · F foto · T luz · B guía a base · L aterrizar · P pausa · G SD en tierra. Esc libera el ratón.</p><p>Recomendado: Chrome o Edge en computador. En gafas consulta <a href="QA-QUEST.md">QA-QUEST</a>.</p><button onclick="this.closest('dialog').close()">Cerrar</button></dialog>
-    <dialog id="aboutProject"><h2>Acerca del proyecto DSE</h2><p>Autor: juortizra (usuario del repositorio; nombre completo por confirmar).</p><p>Contexto didáctico: inspección después del sismo. La fecha 10 de agosto de 2026 en Colombia forma parte del escenario propuesto; no se presenta como un terremoto histórico verificado.</p><p class="diagram">Dron + módulo con batería → SD física → unidad de tierra con IA y batería → reglas → veredicto orientativo</p><p>El vuelo, la cámara renderizada, láser, IMU, batería, SD y TFT simulan componentes del prototipo. La detección de grietas es un adaptador sintético del modelo de IA liviano: NO ejecuta una red neuronal ni mide el rendimiento de una Raspberry Pi. Las reglas sí se ejecutan con los datos simulados y explican su recomendación. El piloto decide.</p><p>ODS 11: comunidades resilientes y triage postsismo. ODS 9: instrumentación e infraestructura; ODS 3: reducir exposición a estructuras peligrosas; ODS 10: herramienta educativa accesible y sin conexión, sin sustituir una evaluación profesional.</p><p>El módulo consume una batería simulada. La unidad de tierra se concibe alimentada por batería: su autonomía real queda [VERIFICAR], no está modelada eléctricamente. La aplicación puede quedar en caché después de la primera carga completa.</p><p>Limitaciones: resolución de grietas, superficies y luz, error de sensores, daños ocultos, réplicas y falsos positivos/negativos. No certifica habitabilidad. Evaluación oficial únicamente por personal certificado.</p><p><a href="https://github.com/juortizra/DSE" target="_blank" rel="noopener">Código y documentación del proyecto</a></p><button onclick="this.closest('dialog').close()">Cerrar</button></dialog>
+    <div id="xrTools">
+      <span id="xrStatus"></span><button id="exitXR" hidden>Salir de XR</button
+      ><button id="insertSD" hidden>Insertar SD</button>
+    </div>
+    <aside id="demoBar" hidden>
+      <p id="demoCaption" role="status" aria-live="polite"></p>
+      <button id="takeControl">Interrumpir / tomar el control</button>
+    </aside>
+    <dialog id="controlsDialog">
+      <h2>Controles y comodidad</h2>
+      <fieldset>
+        <legend>Accesibilidad y rendimiento</legend>
+        <label
+          >Tamaño del texto
+          <input
+            id="textSize"
+            type="range"
+            min="1"
+            max="1.6"
+            step=".1" /></label
+        ><label
+          >Volumen
+          <input id="volume" type="range" min="0" max="1" step=".05" /></label
+        ><label
+          ><input id="soundSubtitles" type="checkbox" /> Subtítulos de
+          sonidos</label
+        ><label
+          ><input id="reduceMotion" type="checkbox" /> Reducir movimiento (sin
+          balanceo, sacudidas ni flash; recomienda FPV)</label
+        ><label
+          ><input id="lowPower" type="checkbox" /> Rendimiento: resolución
+          reducida y sin sombras</label
+        >
+      </fieldset>
+      <label
+        ><input type="checkbox" id="immersiveView" /> Vista inmersiva VR
+        (opcional, modo sentado; velocidad reducida). Por defecto: monitor FPV
+        estable.</label
+      >
+      <p>
+        Quest: stick izquierdo altura/giro; derecho desplazamiento; gatillo
+        foto; A/X regreso a base; B/Y cambiar vista o colocar maqueta MR. Agarre
+        mueve la maqueta; ambos agarres escalan. Tras aterrizar en MR: agarrar
+        SD y soltar junto a unidad, o gatillo/botón Insertar SD.
+      </p>
+      <p>
+        W/S avanzar · A/D lateral · Q/E altura · flechas o ratón orientar ·
+        Shift precisión · F foto · T luz · B guía a base · L aterrizar · P pausa
+        · G SD en tierra. Esc libera el ratón.
+      </p>
+      <p>
+        Recomendado: Chrome o Edge en computador. En gafas consulta
+        <a href="QA-QUEST.md">QA-QUEST</a>.
+      </p>
+      <button onclick="this.closest('dialog').close()">Cerrar</button>
+    </dialog>
+    <dialog id="aboutProject">
+      <h2>Acerca del proyecto DSE</h2>
+      <p>
+        Autor: juortizra (usuario del repositorio; nombre completo por
+        confirmar).
+      </p>
+      <p>
+        Contexto didáctico: inspección después del sismo. La fecha 10 de agosto
+        de 2026 en Colombia forma parte del escenario propuesto; no se presenta
+        como un terremoto histórico verificado.
+      </p>
+      <p class="diagram">
+        Dron + módulo con batería → SD física → unidad de tierra con IA y
+        batería → reglas → veredicto orientativo
+      </p>
+      <p>
+        El vuelo, la cámara renderizada, láser, IMU, batería, SD y TFT simulan
+        componentes del prototipo. La detección de grietas es un adaptador
+        sintético del modelo de IA liviano: NO ejecuta una red neuronal ni mide
+        el rendimiento de una Raspberry Pi. Las reglas sí se ejecutan con los
+        datos simulados y explican su recomendación. El piloto decide.
+      </p>
+      <p>
+        ODS 11: comunidades resilientes y triage postsismo. ODS 9:
+        instrumentación e infraestructura; ODS 3: reducir exposición a
+        estructuras peligrosas; ODS 10: herramienta educativa accesible y sin
+        conexión, sin sustituir una evaluación profesional.
+      </p>
+      <p>
+        El módulo consume una batería simulada. La unidad de tierra se concibe
+        alimentada por batería: su autonomía real queda [VERIFICAR], no está
+        modelada eléctricamente. La aplicación puede quedar en caché después de
+        la primera carga completa.
+      </p>
+      <p>
+        Limitaciones: resolución de grietas, superficies y luz, error de
+        sensores, daños ocultos, réplicas y falsos positivos/negativos. No
+        certifica habitabilidad. Evaluación oficial únicamente por personal
+        certificado.
+      </p>
+      <p>
+        <a
+          href="https://github.com/juortizra/DSE"
+          target="_blank"
+          rel="noopener"
+          >Código y documentación del proyecto</a
+        >
+        · <a href="CREDITOS.md">Créditos y licencias</a>
+      </p>
+      <button onclick="this.closest('dialog').close()">Cerrar</button>
+    </dialog>
     <div id="updateNotice" hidden>
       Nueva versión disponible. <button id="applyUpdate">Actualizar</button>
     </div>
+    <p id="motorCaption" hidden>
+      [Motor del dron] Sonido continuo durante el vuelo; aumenta con la
+      velocidad.
+    </p>
+    <p id="audioCaption" role="status" aria-live="polite"></p>
     <div id="flash" aria-hidden="true"></div>
     <footer>
       Simulación educativa. La clasificación oficial la hace el evaluador
       certificado.
     </footer>
-    <script>document.querySelector("#controlsBtn").onclick=()=>document.querySelector("#controlsDialog").showModal();</script><script type="module" src="app.js"></script>
+    <script>
+      document.querySelector("#controlsBtn").onclick = () =>
+        document.querySelector("#controlsDialog").showModal();
+    </script>
+    <script type="module" src="app.js"></script>
   </body>
 </html>
