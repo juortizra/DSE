@@ -1,10 +1,15 @@
-import {zipStore,sessionFiles} from "./export.js";
-import {scoreSession} from "./scoring.js";
-import {evaluateAgent,LABELS,DISCLAIMER} from "./agent.js";
-import {SimulatedDetector} from "./detector.js";
-import {measureCrack,oraclePixels,scaleMmPerPixel,focalPixels} from "./measurement.js";
-import {CONFIG as C,VFOV} from "./config.js";
-import {samplePacket,batteryDrain} from "./sensors.js";
+import { zipStore, sessionFiles } from "./export.js";
+import { scoreSession } from "./scoring.js";
+import { evaluateAgent, LABELS, DISCLAIMER } from "./agent.js";
+import { SimulatedDetector } from "./detector.js";
+import {
+  measureCrack,
+  oraclePixels,
+  scaleMmPerPixel,
+  focalPixels,
+} from "./measurement.js";
+import { CONFIG as C, VFOV } from "./config.js";
+import { samplePacket, batteryDrain } from "./sensors.js";
 import * as T from "./vendor/three.module.js";
 import { cases, estimate, suggest } from "./rules.js";
 import { photoQuality } from "./quality.js";
@@ -36,8 +41,14 @@ sun.shadow.bias = -0.0008;
 scene.add(hemi, sun);
 const rig = new T.Group();
 scene.add(rig);
-const camera = new T.PerspectiveCamera(VFOV, innerWidth / innerHeight, 0.04, 180);
-camera.rotation.order = "YXZ";camera.position.z=-C.camera.offsetM;
+const camera = new T.PerspectiveCamera(
+  VFOV,
+  innerWidth / innerHeight,
+  0.04,
+  180,
+);
+camera.rotation.order = "YXZ";
+camera.position.z = -C.camera.offsetM;
 rig.add(camera);
 const lamp = new T.SpotLight(0xfff1cf, 0, 12, 0.7, 0.6, 1);
 lamp.position.set(0, 0, 0.05);
@@ -47,6 +58,8 @@ let world,
   environment,
   points = [],
   colliders = [],
+  sensorTargets = [],
+  sensorBounds = [],
   bounds = [],
   markers = [],
   photos = [],
@@ -66,7 +79,37 @@ let world,
   returning = false,
   finishReason = "",
   xrMode = null;
-let calibrated=false,flightSeconds=0,sortie=1,flightToken=0,capturing=false,difficultyKey="normal";const truth=new Map(),batteryWarnings=new Set();let groundResults=[],processingToken=0,resumeSortie=false,agentResult=null,decisionRecord=null;let quakeEnabled=false,quakeDone=false,quakeLeft=0,tutorialActive=false;const fallingDebris=[];let hum=null,humGain=null,sensorAccumulator=0;let stats={seconds:0,batteryUsed:0,flights:0,contacts:0,crashes:0,boundaries:0};const detector=new SimulatedDetector();const difficulty=()=>C.difficulties[difficultyKey];
+let calibrated = false,
+  flightSeconds = 0,
+  sortie = 1,
+  flightToken = 0,
+  capturing = false,
+  difficultyKey = "normal";
+const truth = new Map(),
+  batteryWarnings = new Set();
+let groundResults = [],
+  processingToken = 0,
+  resumeSortie = false,
+  agentResult = null,
+  decisionRecord = null;
+let quakeEnabled = false,
+  quakeDone = false,
+  quakeLeft = 0,
+  tutorialActive = false;
+const fallingDebris = [];
+let hum = null,
+  humGain = null,
+  sensorAccumulator = 0;
+let stats = {
+  seconds: 0,
+  batteryUsed: 0,
+  flights: 0,
+  contacts: 0,
+  crashes: 0,
+  boundaries: 0,
+};
+const detector = new SimulatedDetector();
+const difficulty = () => C.difficulties[difficultyKey];
 const velocity = new T.Vector3(),
   keys = {},
   ray = new T.Raycaster(),
@@ -89,6 +132,13 @@ function build(l) {
   world = environment.group;
   scene.add(world);
   colliders = environment.colliders;
+  sensorTargets = [
+    ...new Set([
+      ...colliders,
+      ...world.children.filter((o) => o.userData.sensorTarget),
+    ]),
+  ];
+  sensorBounds = sensorTargets.map((o) => new T.Box3().setFromObject(o));
   bounds = colliders.map((o) =>
     new T.Box3().setFromObject(o).expandByScalar(C.flight.collisionRadius),
   );
@@ -113,7 +163,9 @@ function build(l) {
   sun.intensity = 2.8 * environment.light;
   renderer.shadowMap.needsUpdate = true;
 }
-function menu() {processingToken++;
+function menu() {
+  processingToken++;
+  if (humGain) humGain.gain.value = 0;
   $("#status").textContent = "INSPECCIÓN POSTSISMO · 2G";
   active = false;
   paused = false;
@@ -122,13 +174,29 @@ function menu() {processingToken++;
   $("#panel").hidden = false;
   $("#panel").className = "";
   $("#panel").innerHTML =
-    `<div class="eyebrow">INGENIERÍA ELECTRÓNICA / COLOMBIA</div><h1>Después del sismo.<br><em>Antes del veredicto.</em></h1><p class="intro">Pilota un dron de inspección, documenta daños y recupera la SD para analizarlos en tierra. Apoyo al triage, nunca sustituto del evaluador certificado.</p><div class="controls-sheet"><label>Dificultad <select id="difficulty">${Object.entries(C.difficulties).map(([k,v])=>`<option value="${k}" ${k===difficultyKey?'selected':''}>${v.label}</option>`).join('')}</select></label><label><input type="checkbox" id="replica" ${quakeEnabled?'checked':''}> Réplica sísmica opcional</label></div><p>Primera visita: en la vivienda hay tutorial guiado de ${C.tutorial.seconds} s.</p><section id="missions">${["Vivienda / sector residencial", "Apartamentos / sector urbano", "Edificio / corredor vial"].map((n, i) => `<button data-level="${i}"><small>MISIÓN 0${i + 1}</small><h2>${n}</h2><p>Reconoce el sitio, reúne evidencias y decide.</p><strong>Preparar misión →</strong></button>`).join("")}</section><p class="note">Análisis sintético educativo, no una IA real. Sin CDN ni transmisión. Ratón y teclado necesarios para pilotar.</p>`;
+    `<div class="eyebrow">INGENIERÍA ELECTRÓNICA / COLOMBIA</div><h1>Después del sismo.<br><em>Antes del veredicto.</em></h1><p class="intro">Pilota un dron de inspección, documenta daños y recupera la SD para analizarlos en tierra. Apoyo al triage, nunca sustituto del evaluador certificado.</p><div class="controls-sheet"><label>Dificultad <select id="difficulty">${Object.entries(
+      C.difficulties,
+    )
+      .map(
+        ([k, v]) =>
+          `<option value="${k}" ${k === difficultyKey ? "selected" : ""}>${v.label}</option>`,
+      )
+      .join(
+        "",
+      )}</select></label><label><input type="checkbox" id="replica" ${quakeEnabled ? "checked" : ""}> Réplica sísmica opcional</label></div><p>Primera visita: en la vivienda hay tutorial guiado de ${C.tutorial.seconds} s.</p><section id="missions">${["Vivienda / sector residencial", "Apartamentos / sector urbano", "Edificio / corredor vial"].map((n, i) => `<button data-level="${i}"><small>MISIÓN 0${i + 1}</small><h2>${n}</h2><p>Reconoce el sitio, reúne evidencias y decide.</p><strong>Preparar misión →</strong></button>`).join("")}</section><p class="note">Análisis sintético educativo, no una IA real. Sin CDN ni transmisión. Ratón y teclado necesarios para pilotar.</p>`;
   $("#panel").onclick = (e) => {
     const b = e.target.closest("[data-level]");
-    if (b){difficultyKey=$("#difficulty").value;quakeEnabled=$("#replica").checked;briefing(+b.dataset.level);}
+    if (b) {
+      difficultyKey = $("#difficulty").value;
+      quakeEnabled = $("#replica").checked;
+      briefing(+b.dataset.level);
+    }
   };
 }
-function briefing(l) {resumeSortie=false;photos=[];truth.clear();
+function briefing(l) {
+  resumeSortie = false;
+  photos = [];
+  truth.clear();
   level = l;
   build(l);
   rig.position.set(17, 12, 23);
@@ -146,6 +214,7 @@ function briefing(l) {resumeSortie=false;photos=[];truth.clear();
   };
 }
 function start(l) {
+  clearKeys();
   $("#pauseBtn").textContent = "Pausa [P]";
   level = l;
   build(l);
@@ -154,13 +223,40 @@ function start(l) {
   camera.rotation.set(0, 0, 0);
   yaw = pitch = bank = tilt = 0;
   velocity.set(0, 0, 0);
-  if(!resumeSortie){photos=[];truth.clear();sortie=1;stats={seconds:0,batteryUsed:0,flights:0,contacts:0,crashes:0,boundaries:0};decisionRecord=null;quakeDone=false;}else {sortie++;for(const p of photos.filter(p=>p.quality.accepted&&!p.preReplica)){if(points[p.point]){points[p.point].best=p;points[p.point].state='aceptada';}}}resumeSortie=false;flightSeconds=0;flightToken++;sensorCache=null;
+  if (!resumeSortie) {
+    photos = [];
+    truth.clear();
+    sortie = 1;
+    stats = {
+      seconds: 0,
+      batteryUsed: 0,
+      flights: 0,
+      contacts: 0,
+      crashes: 0,
+      boundaries: 0,
+    };
+    decisionRecord = null;
+    quakeDone = false;
+  } else {
+    sortie++;
+    for (const p of photos.filter((p) => p.quality.accepted && !p.preReplica)) {
+      if (points[p.point]) {
+        points[p.point].best = p;
+        points[p.point].state = "aceptada";
+      }
+    }
+  }
+  resumeSortie = false;
+  flightSeconds = 0;
+  flightToken++;
+  sensorCache = null;
   chosen = 0;
   lastShot = -Infinity;
   lastImpact = -Infinity;
   lightOn = false;
   lamp.intensity = 0;
-  battery = 100;batteryWarnings.clear();
+  battery = 100;
+  batteryWarnings.clear();
   returning = false;
   paused = false;
   active = true;
@@ -171,7 +267,13 @@ function start(l) {
   toast(
     "Despega: W hacia el edificio, E sube. Entra por ACCESO; para subir al piso 2 usa el hueco al frente-derecha. Selecciona un punto y dispara con F a 0,05–1,2 m (segmento de grieta).",
   );
-  try{tutorialActive=l===0&&!localStorage.getItem("dse-tutorial-2");}catch{tutorialActive=l===0;} initHum();updateHUD();
+  try {
+    tutorialActive = l === 0 && !localStorage.getItem("dse-tutorial-2");
+  } catch {
+    tutorialActive = l === 0;
+  }
+  initHum();
+  updateHUD();
 }
 function toast(t) {
   $("#message").textContent = t;
@@ -246,10 +348,68 @@ onblur = () => {
 function cam() {
   return renderer.xr.isPresenting ? renderer.xr.getCamera() : camera;
 }
-let sensorCache=null,lastSensorMs=-Infinity;
-function coneHits(){scene.updateMatrixWorld(true);const c=cam(),origin=c.getWorldPosition(new T.Vector3()),q=c.getWorldQuaternion(new T.Quaternion()),dirs=[new T.Vector3(0,0,-1)];for(let r=1;r<=C.laser.coneRings;r++)for(let j=0;j<C.laser.raysPerRing;j++){const a=j*Math.PI*2/C.laser.raysPerRing,t=Math.tan(C.laser.coneDeg*Math.PI/360)*r/C.laser.coneRings;dirs.push(new T.Vector3(Math.cos(a)*t,Math.sin(a)*t,-1).normalize());}return dirs.flatMap(d=>{ray.set(origin,d.applyQuaternion(q));const h=ray.intersectObjects(colliders,false)[0];if(!h)return [];const m=h.object.material;return [{distanceMm:h.distance*1000,glass:!!h.object.userData.glass,reflectance:h.object.userData.reflectance??(m.map?.45:m.color?(.2126*m.color.r+.7152*m.color.g+.0722*m.color.b):.5)}];});}
-function readSensors(timeMs=Date.now()){return samplePacket({timeMs,elapsedSeconds:flightSeconds,calibrated,pitchDeg:T.MathUtils.radToDeg(pitch+tilt),rollDeg:T.MathUtils.radToDeg(bank),yawDeg:T.MathUtils.radToDeg(yaw),battery,hits:coneHits(),sun:!environment.indoor(rig.position)&&environment.light>=1});}
-function laser(){const now=performance.now();if(!sensorCache||now-lastSensorMs>=1000/C.laser.hz){sensorCache=readSensors();lastSensorMs=now;}return sensorCache.laser.valid?sensorCache.laser.mm/1000:Infinity;}
+let sensorCache = null,
+  lastSensorMs = -Infinity;
+function coneHits() {
+  scene.updateMatrixWorld(true);
+  const c = cam(),
+    origin = c.getWorldPosition(new T.Vector3()),
+    q = c.getWorldQuaternion(new T.Quaternion()),
+    dirs = [new T.Vector3(0, 0, -1)];
+  origin.add(new T.Vector3(...C.laser.offsetFromCameraM).applyQuaternion(q));
+  for (let r = 1; r <= C.laser.coneRings; r++)
+    for (let j = 0; j < C.laser.raysPerRing; j++) {
+      const a = (j * Math.PI * 2) / C.laser.raysPerRing,
+        t =
+          (Math.tan((C.laser.coneDeg * Math.PI) / 360) * r) / C.laser.coneRings;
+      dirs.push(
+        new T.Vector3(Math.cos(a) * t, Math.sin(a) * t, -1).normalize(),
+      );
+    }
+  const near = sensorTargets.filter(
+    (o, i) => sensorBounds[i].distanceToPoint(origin) <= C.laser.maxMm / 1000,
+  );
+  return dirs.flatMap((d) => {
+    ray.set(origin, d.applyQuaternion(q));
+    const h = ray.intersectObjects(near, false)[0];
+    if (!h) return [];
+    const m = h.object.material;
+    return [
+      {
+        distanceMm: h.distance * 1000,
+        glass: !!h.object.userData.glass,
+        reflectance:
+          h.object.userData.reflectance ??
+          (m.map
+            ? C.laser.mappedReflectance
+            : m.color
+              ? 0.2126 * m.color.r + 0.7152 * m.color.g + 0.0722 * m.color.b
+              : 0.5),
+      },
+    ];
+  });
+}
+function readSensors(timeMs = Date.now()) {
+  return samplePacket({
+    timeMs,
+    elapsedSeconds: flightSeconds,
+    calibrated,
+    pitchDeg: T.MathUtils.radToDeg(pitch + tilt),
+    rollDeg: T.MathUtils.radToDeg(bank),
+    yawDeg: T.MathUtils.radToDeg(yaw),
+    battery,
+    hits: coneHits(),
+    sun: !environment.indoor(rig.position) && environment.light >= 1,
+  });
+}
+function laser() {
+  const now = performance.now();
+  if (!sensorCache || now - lastSensorMs >= 1000 / C.laser.hz) {
+    sensorCache = readSensors();
+    lastSensorMs = now;
+  }
+  return sensorCache.laser.valid ? sensorCache.laser.mm / 1000 : Infinity;
+}
 function point() {
   return points[chosen];
 }
@@ -314,7 +474,10 @@ function quality() {
       light: illumination(p),
       framed,
       visible,
-      laserValid: Number.isFinite(d) && d >= C.laser.minMm/1000 && d <= C.laser.maxMm/1000,
+      laserValid:
+        Number.isFinite(d) &&
+        d >= C.laser.minMm / 1000 &&
+        d <= C.laser.maxMm / 1000,
       impact: performance.now() - lastImpact < 1500,
     }),
     distance,
@@ -336,7 +499,22 @@ function orient(dt) {
   rig.rotation.set(0, yaw, 0);
   camera.rotation.set(pitch + tilt, 0, bank);
 }
-function move(dt) {tickSensors(dt);if(battery<=0){velocity.set(0,0,0);ray.set(rig.position,new T.Vector3(0,-1,0));const hit=ray.intersectObjects(colliders,false)[0];if(hit&&hit.distance<=C.flight.collisionRadius+C.battery.descentMps*dt){finish("Batería agotada: descenso automático. SD recuperada.");return;}rig.position.y-=C.battery.descentMps*dt;return;}
+function move(dt) {
+  tickSensors(dt);
+  if (battery <= 0) {
+    velocity.set(0, 0, 0);
+    ray.set(rig.position, new T.Vector3(0, -1, 0));
+    const hit = ray.intersectObjects(colliders, false)[0];
+    if (
+      hit &&
+      hit.distance <= C.flight.collisionRadius + C.battery.descentMps * dt
+    ) {
+      finish("Batería agotada: descenso automático. SD recuperada.");
+      return;
+    }
+    rig.position.y -= C.battery.descentMps * dt;
+    return;
+  }
   orient(dt);
   const v = new T.Vector3(
     (keys.KeyD ? 1 : 0) - (keys.KeyA ? 1 : 0),
@@ -344,7 +522,13 @@ function move(dt) {tickSensors(dt);if(battery<=0){velocity.set(0,0,0);ray.set(ri
     (keys.KeyS ? 1 : 0) - (keys.KeyW ? 1 : 0),
   );
   if (v.length() > 1) v.normalize();
-  v.applyAxisAngle(up, yaw).multiplyScalar(C.flight.maxSpeed);v.x+=Math.sin(flightSeconds)*difficulty().windMps;v.z+=Math.cos(flightSeconds*.7)*difficulty().windMps;v.clampLength(0,C.flight.maxSpeed);
+  v.applyAxisAngle(up, yaw).multiplyScalar(
+    C.flight.maxSpeed *
+      (keys.ShiftLeft || keys.ShiftRight ? C.flight.precisionFactor : 1),
+  );
+  v.x += Math.sin(flightSeconds) * difficulty().windMps;
+  v.z += Math.cos(flightSeconds * 0.7) * difficulty().windMps;
+  v.clampLength(0, C.flight.maxSpeed);
   velocity.lerp(v, 1 - Math.exp(-dt * C.flight.stabilizeRate));
   const movement = velocity.clone().multiplyScalar(dt),
     steps = Math.max(1, Math.ceil(movement.length() / 0.06));
@@ -356,31 +540,59 @@ function move(dt) {tickSensors(dt);if(battery<=0){velocity.set(0,0,0);ray.set(ri
       0.24,
       environment.height + 6,
     );
-    if(rig.position.x<C.flight.zone.minX||rig.position.x>C.flight.zone.maxX||rig.position.z<C.flight.zone.minZ||rig.position.z>C.flight.zone.maxZ)stats.boundaries++;
-    rig.position.x = T.MathUtils.clamp(rig.position.x, C.flight.zone.minX,C.flight.zone.maxX);
-    rig.position.z = T.MathUtils.clamp(rig.position.z,C.flight.zone.minZ,C.flight.zone.maxZ);
+    if (
+      rig.position.x < C.flight.zone.minX ||
+      rig.position.x > C.flight.zone.maxX ||
+      rig.position.z < C.flight.zone.minZ ||
+      rig.position.z > C.flight.zone.maxZ
+    )
+      stats.boundaries++;
+    rig.position.x = T.MathUtils.clamp(
+      rig.position.x,
+      C.flight.zone.minX,
+      C.flight.zone.maxX,
+    );
+    rig.position.z = T.MathUtils.clamp(
+      rig.position.z,
+      C.flight.zone.minZ,
+      C.flight.zone.maxZ,
+    );
     if (bounds.some((b) => b.containsPoint(rig.position))) {
       rig.position.copy(old);
       const speed = velocity.length();
-      if(performance.now()-lastImpact>C.flight.impactMs)stats.contacts++;lastImpact = performance.now();
+      if (performance.now() - lastImpact > C.flight.impactMs) stats.contacts++;
+      lastImpact = performance.now();
       velocity.multiplyScalar(-0.18);
       toast("Roce: aléjate del obstáculo y espera a estabilizar.");
       if (START_STAGE >= 3 && speed > C.flight.crashSpeed) {
-        stats.crashes++;finish("Choque fuerte: vuelo interrumpido. Se conservaron las fotos.");
+        stats.crashes++;
+        finish("Choque fuerte: vuelo interrumpido. Se conservaron las fotos.");
         return;
       }
       break;
     }
   }
-  flightSeconds+=dt; battery = Math.max(0, battery - batteryDrain(dt,velocity.length(),lightOn,difficulty().batteryFactor));
-  for(const threshold of C.battery.warnings)if(battery<=threshold&&!batteryWarnings.has(threshold)){batteryWarnings.add(threshold);toast(`Batería ${threshold}%: regresa a base.`);alertTone();}
-
+  flightSeconds += dt;
+  battery = Math.max(
+    0,
+    battery -
+      batteryDrain(dt, velocity.length(), lightOn, difficulty().batteryFactor),
+  );
+  for (const threshold of C.battery.warnings)
+    if (battery <= threshold && !batteryWarnings.has(threshold)) {
+      batteryWarnings.add(threshold);
+      toast(`Batería ${threshold}%: regresa a base.`);
+      alertTone();
+    }
 }
 function bearing(p) {
   const d = p.clone().sub(rig.position);
+  const estimatedYaw = sensorCache
+    ? (sensorCache.imu.yawDeg * Math.PI) / 180
+    : yaw;
   const a =
     T.MathUtils.euclideanModulo(
-      Math.atan2(-d.x, -d.z) - yaw + Math.PI,
+      Math.atan2(-d.x, -d.z) - estimatedYaw + Math.PI,
       Math.PI * 2,
     ) - Math.PI;
   return Math.abs(a) < 0.12
@@ -396,9 +608,12 @@ function updateHUD() {
   const inside = environment.indoor(rig.position);
   renderer.toneMappingExposure = inside ? (lightOn ? 0.9 : 0.23) : 1;
   const d = laser(),
-    valid = Number.isFinite(d) && d >= C.laser.minMm/1000 && d <= C.laser.maxMm/1000;
+    valid =
+      Number.isFinite(d) &&
+      d >= C.laser.minMm / 1000 &&
+      d <= C.laser.maxMm / 1000;
   $("#metrics").innerHTML =
-    `<span class="${valid ? "" : "bad"}">LÁSER ${valid ? d.toFixed(2) + " m" : "FUERA DE RANGO"}</span><br>BATERÍA ${battery.toFixed(0)} %<br>ALTURA ${rig.position.y.toFixed(1)} m<br>VELOCIDAD ${velocity.length().toFixed(2)} m/s<br>${inside ? "INTERIOR · " + (lightOn ? "LUZ ON" : "LUZ OFF [T]") : "EXTERIOR"}<br>SD ${photos.length} fotos · ${accepted()}/${points.length} puntos`;
+    `<span class="${valid ? "" : "bad"}">LÁSER ${valid ? d.toFixed(2) + " m" : "FUERA DE RANGO"}</span><br>BATERÍA ${battery.toFixed(0)} %<br>MPU · YAW ${sensorCache?.imu.yawDeg.toFixed(1) ?? "—"}°${calibrated ? " CAL" : " SIN CAL"}<br>ALTURA ${rig.position.y.toFixed(1)} m<br>VELOCIDAD ${velocity.length().toFixed(2)} m/s<br>${inside ? "INTERIOR · " + (lightOn ? "LUZ ON" : "LUZ OFF [T]") : "EXTERIOR"}<br>SD ${photos.length} fotos · ${accepted()}/${points.length} puntos`;
   const p = point(),
     q = quality();
   $("#target").innerHTML =
@@ -461,14 +676,17 @@ function shutter() {
     const o = audio.createOscillator(),
       g = audio.createGain();
     o.type = "triangle";
-    o.frequency.setValueAtTime(950, audio.currentTime);
-    o.frequency.exponentialRampToValueAtTime(130, audio.currentTime + 0.08);
-    g.gain.setValueAtTime(0.07, audio.currentTime);
+    o.frequency.setValueAtTime(C.audio.shutterStartHz, audio.currentTime);
+    o.frequency.exponentialRampToValueAtTime(
+      C.audio.shutterEndHz,
+      audio.currentTime + C.audio.shutterSeconds * 0.8,
+    );
+    g.gain.setValueAtTime(C.audio.shutterGain, audio.currentTime);
     g.gain.exponentialRampToValueAtTime(0.001, audio.currentTime + 0.1);
     o.connect(g);
     g.connect(audio.destination);
     o.start();
-    o.stop(audio.currentTime + 0.11);
+    o.stop(audio.currentTime + C.audio.shutterSeconds);
   } catch {}
   $("#flash").classList.remove("shoot");
   void $("#flash").offsetWidth;
@@ -477,9 +695,9 @@ function shutter() {
 function snapshot() {
   renderer.toneMappingExposure = environment.indoor(rig.position)
     ? lightOn
-      ? 0.9
-      : 0.23
-    : 1;
+      ? C.camera.exposureLit
+      : C.camera.exposureIndoor
+    : C.camera.exposureOutdoor;
   const target = new T.WebGLRenderTarget(C.camera.width, C.camera.height),
     photoCam = new T.PerspectiveCamera(VFOV, 16 / 9, 0.04, 180),
     pixels = new Uint8Array(C.camera.width * C.camera.height * 4);
@@ -494,7 +712,14 @@ function snapshot() {
     renderer.xr.enabled = false;
     renderer.setRenderTarget(target);
     renderer.render(scene, photoCam);
-    renderer.readRenderTargetPixels(target, 0, 0, C.camera.width, C.camera.height, pixels);
+    renderer.readRenderTargetPixels(
+      target,
+      0,
+      0,
+      C.camera.width,
+      C.camera.height,
+      pixels,
+    );
   } finally {
     renderer.setRenderTarget(before);
     renderer.xr.enabled = xr;
@@ -508,37 +733,120 @@ function snapshot() {
     img = ctx.createImageData(C.camera.width, C.camera.height);
   for (let y = 0; y < C.camera.height; y++)
     img.data.set(
-      pixels.subarray((C.camera.height - 1 - y) * C.camera.width*4, (C.camera.height - y) * C.camera.width*4),
-      y * C.camera.width*4,
+      pixels.subarray(
+        (C.camera.height - 1 - y) * C.camera.width * 4,
+        (C.camera.height - y) * C.camera.width * 4,
+      ),
+      y * C.camera.width * 4,
     );
   ctx.putImageData(img, 0, 0);
   return degradePhoto(out);
 }
 async function capture() {
- if(!active||paused||xrMode) return;
- if(photos.filter(p=>p.sortie===sortie).length>=C.sd.capacity){toast('SD llena: regresa a base.');return;}
- if(capturing||performance.now()-lastShot<1000){toast('Espera al obturador y al intervalo entre fotos.');return;}
- capturing=true;const token=flightToken;toast('Obturador…');
- await new Promise(r=>setTimeout(r,C.camera.shutterMs));
- if(!active||paused||token!==flightToken){capturing=false;return;}
- // Todas las lecturas y la pose se congelan EN EL INSTANTE DE EXPOSICIÓN, no al pulsar F.
- const p=point(),q=quality(),timeMs=Date.now(),packet=readSensors(timeMs),id=photos.length+1;
- packet.imu.wallAngleDeg=T.MathUtils.clamp(q.angle+(packet.imu.yawDeg-T.MathUtils.radToDeg(yaw))+(packet.imu.pitchDeg-T.MathUtils.radToDeg(pitch+tilt)),0,85);
- const image=snapshot();
- const record={id,timeMs,image,sensors:packet,quality:{score:q.score,accepted:q.accepted,reasons:q.reasons},distance:packet.laser.valid?packet.laser.mm/1000:Infinity,tilt:packet.imu.pitchDeg,name:p.name,point:chosen,inside:p.inside,time:new Date(timeMs).toLocaleTimeString('es-CO'),sortie};
- truth.set(id,{timeMs,point:chosen,distanceMm:q.distance*1000,angleDeg:q.angle,widthMm:p.width,pitchDeg:T.MathUtils.radToDeg(pitch+tilt),rollDeg:T.MathUtils.radToDeg(bank),position:rig.position.toArray()});
- photos.push(record);lastShot=performance.now();capturing=false;shutter();
- $('#thumbnail').src=image;$('#thumbnail').hidden=false;
- if(q.accepted){p.state='aceptada';p.best=record;const next=points.findIndex(p=>!p.best);if(next>=0)chosen=next;else returning=true;}
- else p.state=p.best?'aceptada':'rechazada';
- toast(q.accepted?`Foto ${id} guardada en SD · calidad local ${q.score}%.`:`Foto ${id} guardada (${q.score}%): ${q.reasons.join(' ')}`);updateHUD();
+  if (!active || paused || xrMode) return;
+  if (photos.filter((p) => p.sortie === sortie).length >= C.sd.capacity) {
+    toast("SD llena: regresa a base.");
+    return;
+  }
+  if (capturing || performance.now() - lastShot < 1000) {
+    toast("Espera al obturador y al intervalo entre fotos.");
+    return;
+  }
+  capturing = true;
+  const token = flightToken;
+  toast("Obturador…");
+  await new Promise((r) => setTimeout(r, C.camera.shutterMs));
+  if (!active || paused || token !== flightToken) {
+    capturing = false;
+    return;
+  }
+  // Todas las lecturas y la pose se congelan EN EL INSTANTE DE EXPOSICIÓN, no al pulsar F.
+  const p = point(),
+    q = quality(),
+    timeMs = Date.now(),
+    packet = readSensors(timeMs),
+    id = photos.length + 1;
+  if (!packet.laser.valid) {
+    q.accepted = false;
+    q.score = Math.min(q.score, C.quality.accepted - 1);
+    if (!q.reasons.some((r) => r.includes("Láser")))
+      q.reasons.push("Láser inválido al exponer: " + packet.laser.reason);
+  }
+  packet.imu.wallAngleDeg = T.MathUtils.clamp(
+    q.angle +
+      (packet.imu.yawDeg - T.MathUtils.radToDeg(yaw)) +
+      (packet.imu.pitchDeg - T.MathUtils.radToDeg(pitch + tilt)),
+    0,
+    C.imu.maxWallAngleDeg,
+  );
+  packet.imu.wallAngleSource =
+    "IMU + normal al muro SIMULADA; no función nativa del MPU6050";
+  const image = snapshot();
+  const record = {
+    id,
+    timeMs,
+    image,
+    sensors: packet,
+    quality: { score: q.score, accepted: q.accepted, reasons: q.reasons },
+    distance: packet.laser.valid ? packet.laser.mm / 1000 : Infinity,
+    tilt: packet.imu.pitchDeg,
+    name: p.name,
+    point: chosen,
+    inside: p.inside,
+    time: new Date(timeMs).toLocaleTimeString("es-CO"),
+    sortie,
+  };
+  truth.set(id, {
+    timeMs,
+    point: chosen,
+    distanceMm: q.distance * 1000,
+    angleDeg: q.angle,
+    widthMm: p.width,
+    box: captureRegion(p),
+    pitchDeg: T.MathUtils.radToDeg(pitch + tilt),
+    rollDeg: T.MathUtils.radToDeg(bank),
+    position: rig.position.toArray(),
+  });
+  photos.push(record);
+  lastShot = performance.now();
+  capturing = false;
+  shutter();
+  $("#thumbnail").src = image;
+  $("#thumbnail").hidden = true;
+  if (q.accepted) {
+    p.state = "aceptada";
+    p.best = record;
+    const next = points.findIndex((p) => !p.best);
+    if (next >= 0) chosen = next;
+    else returning = true;
+  } else p.state = p.best ? "aceptada" : "rechazada";
+  toast(
+    q.accepted
+      ? `Foto ${id} guardada en SD · calidad local ${q.score}%.`
+      : `Foto ${id} guardada (${q.score}%): ${q.reasons.join(" ")}`,
+  );
+  updateHUD();
 }
 function photoCard(p, i, analysis = false) {
-  const gt=truth.get(p.id);const e=analysis&&gt?measureCrack({pixels:oraclePixels(gt),laser:p.sensors.laser,angleDeg:p.sensors.imu.wallAngleDeg}):{measurable:false};
-  return `<article><img src="${p.image}" alt="Foto real ${i + 1}: ${p.name}" loading="lazy"><h3>${i + 1}. ${p.name}</h3><p class="${p.quality.accepted ? "good" : "bad"}">${p.quality.accepted ? "ACEPTADA" : "RECHAZADA"} · calidad ${p.quality.score}%</p><p>${p.time} · láser ${Number.isFinite(p.distance) ? p.distance.toFixed(2) + " m" : "sin lectura"} · cabeceo ${(p.sensors.imu.pitchDeg).toFixed(1)}° · batería ${p.sensors.battery.percent.toFixed(0)}%<br>${p.quality.reasons.join("<br>") || "Encuadre, distancia y estabilidad correctos."}</p>${analysis && p.quality.accepted ? `<p>${e.measurable ? `Ancho simulado: ${e.widthMm.toFixed(2)} ± ${e.uncertaintyMm.toFixed(2)} mm` : (e.reason||"No medible")}</p>` : ""}</article>`;
+  const gt = truth.get(p.id);
+  const e =
+    analysis && gt
+      ? measureCrack({
+          pixels: oraclePixels(gt),
+          laser: p.sensors.laser,
+          angleDeg: p.sensors.imu.wallAngleDeg,
+        })
+      : { measurable: false };
+  return `<article><img src="${p.image}" alt="Foto real ${i + 1}: ${p.name}" loading="lazy"><h3>${i + 1}. ${p.name}</h3><p class="${p.quality.accepted ? "good" : "bad"}">${p.quality.accepted ? "ACEPTADA" : "RECHAZADA"} · calidad ${p.quality.score}%</p><p>${p.time} · láser ${Number.isFinite(p.distance) ? p.distance.toFixed(2) + " m" : "sin lectura"} · cabeceo ${p.sensors.imu.pitchDeg.toFixed(1)}° · batería ${p.sensors.battery.percent.toFixed(0)}%<br>${p.quality.reasons.join("<br>") || "Encuadre, distancia y estabilidad correctos."}</p>${analysis && p.quality.accepted ? `<p>${e.measurable ? `Ancho simulado: ${e.widthMm.toFixed(2)} ± ${e.uncertaintyMm.toFixed(2)} mm` : e.reason || "No medible"}</p>` : ""}</article>`;
 }
 let galleryWasPaused = false;
-function gallery() {if(active){toast("SD no consultable durante el vuelo: sin enlace de datos. Revisa las imágenes en tierra.");return;}
+function gallery() {
+  if (active) {
+    toast(
+      "SD no consultable durante el vuelo: sin enlace de datos. Revisa las imágenes en tierra.",
+    );
+    return;
+  }
   if ($("#gallery").open) {
     $("#gallery").close();
     paused = galleryWasPaused;
@@ -569,19 +877,14 @@ function returnToBase() {
 }
 function land() {
   if (!active || paused) return;
-  if (false && accepted() < points.length) {
-    toast(
-      `Faltan ${points.length - accepted()} puntos aceptados. Completa la inspección antes de aterrizar.`,
-    );
-    return;
-  }
+
   if (
     Math.hypot(
       rig.position.x - environment.base.x,
       rig.position.z - environment.base.z,
-    ) > 1.7 ||
-    rig.position.y > 0.75 ||
-    velocity.length() > 0.3
+    ) > C.flight.landRadius ||
+    rig.position.y > C.flight.landHeight ||
+    velocity.length() > C.flight.landSpeed
   ) {
     toast(
       "Aterrizaje: sitúate en H, baja de 0,75 m y espera velocidad < 0,3 m/s.",
@@ -590,32 +893,145 @@ function land() {
   }
   finish("Aterrizaje completado. SD recuperada en la unidad de tierra.");
 }
-function finish(reason) {stats.seconds+=flightSeconds;stats.batteryUsed+=100-battery;stats.flights++;
+function finish(reason) {
+  stats.seconds += flightSeconds;
+  stats.batteryUsed += 100 - battery;
+  stats.flights++;
   active = false;
   paused = false;
   clearKeys();
-  velocity.set(0, 0, 0);flightToken++;capturing=false;
+  velocity.set(0, 0, 0);
+  flightToken++;
+  capturing = false;
   finishReason = reason;
   renderer.xr.getSession()?.end();
   document.exitPointerLock?.();
   $("#hud").hidden = true;
   analyze();
 }
-async function analyze(){
- const token=++processingToken;groundResults=[];$('#panel').hidden=false;$('#panel').className='analysis';window.scrollTo(0,0);
- $('#panel').innerHTML=`<div class="eyebrow">RASPBERRY PI ZERO 2 W / SD EN TIERRA</div><h1>Unidad de tierra</h1><p>${finishReason}</p><p>Simulación del modelo de IA liviano del proyecto. No es inferencia de IA real ni un benchmark de la Raspberry Pi.</p><canvas id="tft" width="${C.ground.width}" height="${C.ground.height}"></canvas><p id="queueState">Cargando SD…</p><div id="coverage"></div><div id="processed" class="photo-grid"></div><div id="groundSummary"></div>`;
- for(let i=0;i<photos.length;i++){
-  if(token!==processingToken)return;drawTFT(i,photos.length,photos[i]);$('#queueState').textContent=`Procesando foto ${i+1}/${photos.length}…`;
-  await new Promise(r=>setTimeout(r,C.ground.minProcessMs+Math.random()*(C.ground.maxProcessMs-C.ground.minProcessMs)));if(token!==processingToken)return;
-  const result=await detector.detect(photos[i],truth.get(photos[i].id),C.scenarios[level]);groundResults.push(result);
-  const element=document.createElement('div');element.innerHTML=detectedCard(photos[i],result,i);$('#processed').append(element);drawCoverage();
- }
- if(token!==processingToken)return;$('#queueState').textContent='Cola terminada. SD leída sin transmitir durante el vuelo.';drawTFT(photos.length,photos.length);renderGroundSummary();
+async function analyze() {
+  const token = ++processingToken;
+  groundResults = [];
+  $("#panel").hidden = false;
+  $("#panel").className = "analysis";
+  window.scrollTo(0, 0);
+  $("#panel").innerHTML =
+    `<div class="eyebrow">RASPBERRY PI ZERO 2 W / SD EN TIERRA</div><h1>Unidad de tierra</h1><p>${finishReason}</p><p>Simulación del modelo de IA liviano del proyecto. No es inferencia de IA real ni un benchmark de la Raspberry Pi.</p><canvas id="tft" width="${C.ground.width}" height="${C.ground.height}"></canvas><p id="queueState">Cargando SD…</p><div id="coverage"></div><div id="processed" class="photo-grid"></div><div id="groundSummary"></div>`;
+  for (let i = 0; i < photos.length; i++) {
+    if (token !== processingToken) return;
+    drawTFT(i, photos.length, photos[i]);
+    $("#queueState").textContent = `Procesando foto ${i + 1}/${photos.length}…`;
+    await new Promise((r) =>
+      setTimeout(
+        r,
+        C.ground.minProcessMs +
+          Math.random() * (C.ground.maxProcessMs - C.ground.minProcessMs),
+      ),
+    );
+    if (token !== processingToken) return;
+    const result = await detector.detect(
+      photos[i],
+      truth.get(photos[i].id),
+      C.scenarios[level],
+    );
+    groundResults.push(result);
+    const element = document.createElement("div");
+    element.innerHTML = detectedCard(photos[i], result, i);
+    $("#processed").append(element);
+    drawCoverage();
+  }
+  if (token !== processingToken) return;
+  $("#queueState").textContent =
+    "Cola terminada. SD leída sin transmitir durante el vuelo.";
+  drawTFT(photos.length, photos.length);
+  renderGroundSummary();
 }
-function detectedCard(p,r,i){const boxes=r.detections.map(d=>`<div class="detection" style="left:${d.box.x*100}%;top:${d.box.y*100}%;width:${d.box.w*100}%;height:${d.box.h*100}%"><span>${d.measure.measurable?d.measure.widthMm.toFixed(2)+' ± '+d.measure.uncertaintyMm.toFixed(2)+' mm':'No medible'}</span></div>`).join('');return `<article><div class="detected-photo"><img src="${p.image}" alt="Captura ${p.id}: ${p.name}">${boxes}</div><h3>${p.id}. ${p.name}</h3><p>Calidad ${p.quality.score}% · ${p.quality.accepted?'aceptada':'rechazada'}</p><p>${r.miss?'No se resolvió la grieta; posible falso negativo.':r.detections.map(d=>d.kind+': '+(d.measure.reason||d.measure.widthMm.toFixed(2)+' ± '+d.measure.uncertaintyMm.toFixed(2)+' mm')).join('<br>')}</p><p>${p.quality.reasons.join('<br>')}</p></article>`;}
-function drawTFT(done,total,p){const c=$('#tft');if(!c)return;const x=c.getContext('2d');x.fillStyle='#101c17';x.fillRect(0,0,c.width,c.height);x.font='13px monospace';x.fillStyle='#9ee2a0';x.fillText('PI ZERO 2 W / TFT 320x240',10,22);x.fillText('SD local · sin enlace de vuelo',10,45);x.fillText(`Cola ${done}/${total}`,10,72);x.strokeStyle='#9ee2a0';x.strokeRect(10,90,300,16);x.fillRect(10,90,total?300*done/total:300,16);x.fillText(p?'Foto '+p.id+': procesando':'Procesamiento terminado',10,135);x.fillText('IA LIVIANA: SIMULACIÓN',10,170);x.fillText('Revisar cobertura y reglas',10,204);}
-function drawCoverage(){const seen=new Set(groundResults.filter(r=>r.quality>=C.quality.accepted).map(r=>r.point));$('#coverage').innerHTML='<h3>Cobertura de checkpoints</h3>'+points.map((p,i)=>`<span class="coverage ${seen.has(i)?'good':'bad'}">${i+1}: ${seen.has(i)?'foto de calidad':'pendiente / insuficiente'}</span>`).join('');}
-function renderGroundSummary(){agentResult=evaluateAgent({required:points.map((p,i)=>i),results:groundResults});const a=agentResult;$('#groundSummary').innerHTML=`<h2>Sugerencia: ${a.label}</h2><p>${DISCLAIMER}</p><p>${a.referral}</p><p>Confianza de cobertura/calidad ${(a.confidence*100).toFixed(0)}% (no probabilidad de seguridad).</p><ul>${a.rules.map(r=>`<li>${LABELS[r.level]} · ${r.text}</li>`).join('')}</ul>${a.missing.length?'<h3>Qué falta</h3><ul>'+a.missing.map(t=>'<li>'+t+'</li>').join('')+'</ul><button id="secondSortie">Segunda salida · batería nueva y conservar fotos</button>':''}<h3>No evaluable con este sistema</h3><ul>${a.notEvaluable.map(t=>'<li>'+t+'</li>').join('')}</ul>${a.verdict===null?'<button id="partialReport">Ver informe parcial (INDETERMINADO)</button>':''}<div class="choices">${LABELS.map((v,i)=>`<button data-verdict="${i}" ${a.verdict===null?'disabled':''}>${v}</button>`).join('')}</div><label>Si discrepas del agente, elige una razón: <select id="disagreeReason"><option value="">Seleccionar…</option>${C.disagreementReasons.map((r,i)=>`<option value="${i}">${r}</option>`).join('')}</select></label><div id="result"></div><button id="again">Volver a misiones</button>`;$('#again').onclick=menu;$('#partialReport')?.addEventListener('click',()=>{decisionRecord={decision:null,reason:'INDETERMINADO: no hay evidencia suficiente'};showReport();});$('#secondSortie')?.addEventListener('click',()=>{resumeSortie=true;preflight(level);});$('#groundSummary').onclick=e=>{const b=e.target.closest('[data-verdict]');if(b&&a.verdict!==null){const decision=+b.dataset.verdict,reason=$('#disagreeReason').value;if(decision!==a.verdict&&reason===''){$('#result').textContent='Elige una razón para discrepar del agente.';return;}decisionRecord={decision,reason:reason===''?'Coincide con el agente':C.disagreementReasons[+reason]};showReport();}};}
+function detectedCard(p, r, i) {
+  const boxes = r.detections
+    .map(
+      (d) =>
+        `<div class="detection" style="left:${d.box.x * 100}%;top:${d.box.y * 100}%;width:${d.box.w * 100}%;height:${d.box.h * 100}%"><span>${d.measure.measurable ? d.measure.widthMm.toFixed(2) + " ± " + d.measure.uncertaintyMm.toFixed(2) + " mm" : "No medible"}</span></div>`,
+    )
+    .join("");
+  return `<article><div class="detected-photo"><img src="${p.image}" alt="Captura ${p.id}: ${p.name}">${boxes}</div><h3>${p.id}. ${p.name}</h3><p>Calidad ${p.quality.score}% · ${p.quality.accepted ? "aceptada" : "rechazada"}</p><p>${r.miss ? "No se resolvió la grieta; posible falso negativo." : r.detections.map((d) => d.kind + ": " + (d.measure.reason || d.measure.widthMm.toFixed(2) + " ± " + d.measure.uncertaintyMm.toFixed(2) + " mm")).join("<br>")}</p><p>${p.quality.reasons.join("<br>")}</p></article>`;
+}
+function drawTFT(done, total, p) {
+  const c = $("#tft");
+  if (!c) return;
+  const x = c.getContext("2d");
+  x.fillStyle = "#101c17";
+  x.fillRect(0, 0, c.width, c.height);
+  x.font = "13px monospace";
+  x.fillStyle = "#9ee2a0";
+  x.fillText("PI ZERO 2 W / TFT 320x240", 10, 22);
+  x.fillText("SD local · sin enlace de vuelo", 10, 45);
+  x.fillText(`Cola ${done}/${total}`, 10, 72);
+  x.strokeStyle = "#9ee2a0";
+  x.strokeRect(10, 90, 300, 16);
+  x.fillRect(10, 90, total ? (300 * done) / total : 300, 16);
+  x.fillText(
+    p ? "Foto " + p.id + ": procesando" : "Procesamiento terminado",
+    10,
+    135,
+  );
+  x.fillText("IA LIVIANA: SIMULACIÓN", 10, 170);
+  x.fillText("Revisar cobertura y reglas", 10, 204);
+}
+function drawCoverage() {
+  const seen = new Set(
+    groundResults
+      .filter((r) => r.quality >= C.quality.accepted)
+      .map((r) => r.point),
+  );
+  $("#coverage").innerHTML =
+    "<h3>Cobertura de checkpoints</h3>" +
+    points
+      .map(
+        (p, i) =>
+          `<span class="coverage ${seen.has(i) ? "good" : "bad"}">${i + 1}: ${seen.has(i) ? "foto de calidad" : "pendiente / insuficiente"}</span>`,
+      )
+      .join("");
+}
+function renderGroundSummary() {
+  agentResult = evaluateAgent({
+    required: points.map((p, i) => i),
+    results: groundResults,
+  });
+  const a = agentResult;
+  $("#groundSummary").innerHTML =
+    `<h2>Sugerencia: ${a.label}</h2><p>${DISCLAIMER}</p><p>${a.referral}</p>${quakeDone ? "<p>Réplica modelada: se exige repetir la Fase 1. Las fotos previas no cubren checkpoints.</p>" : ""}<p>Confianza de cobertura/calidad ${(a.confidence * 100).toFixed(0)}% (no probabilidad de seguridad).</p><ul>${a.rules.map((r) => `<li>${LABELS[r.level]} · ${r.text}</li>`).join("")}</ul>${a.missing.length ? "<h3>Qué falta</h3><ul>" + a.missing.map((t) => "<li>" + t + "</li>").join("") + '</ul><button id="secondSortie">Segunda salida · batería nueva y conservar fotos</button>' : ""}<h3>No evaluable con este sistema</h3><ul>${a.notEvaluable.map((t) => "<li>" + t + "</li>").join("")}</ul>${a.verdict === null ? '<button id="partialReport">Ver informe parcial (INDETERMINADO)</button>' : ""}<div class="choices">${LABELS.map((v, i) => `<button data-verdict="${i}" ${a.verdict === null ? "disabled" : ""}>${v}</button>`).join("")}</div><label>Si discrepas del agente, elige una razón: <select id="disagreeReason"><option value="">Seleccionar…</option>${C.disagreementReasons.map((r, i) => `<option value="${i}">${r}</option>`).join("")}</select></label><div id="result"></div><button id="again">Volver a misiones</button>`;
+  $("#again").onclick = menu;
+  $("#partialReport")?.addEventListener("click", () => {
+    decisionRecord = {
+      decision: null,
+      reason: "INDETERMINADO: no hay evidencia suficiente",
+    };
+    showReport();
+  });
+  $("#secondSortie")?.addEventListener("click", () => {
+    resumeSortie = true;
+    preflight(level);
+  });
+  $("#groundSummary").onclick = (e) => {
+    const b = e.target.closest("[data-verdict]");
+    if (b && a.verdict !== null) {
+      const decision = +b.dataset.verdict,
+        reason = $("#disagreeReason").value;
+      if (decision !== a.verdict && reason === "") {
+        $("#result").textContent = "Elige una razón para discrepar del agente.";
+        return;
+      }
+      decisionRecord = {
+        decision,
+        reason:
+          reason === ""
+            ? "Coincide con el agente"
+            : C.disagreementReasons[+reason],
+      };
+      showReport();
+    }
+  };
+}
 document.addEventListener("click", (e) => {
   const img = e.target.closest(".photo-grid img");
   if (!img) return;
@@ -723,10 +1139,11 @@ function xrFrame(frame) {
 }
 let hudClock = 0;
 renderer.setAnimationLoop((t, frame) => {
-  const dt = Math.min((t - last) / 1000 || 0, 0.05);
+  const dt = Math.min((t - last) / 1000 || 0, C.flight.dtMax);
   last = t;
   if (active && !paused) {
-    move(dt);extras(dt);
+    move(dt);
+    extras(dt);
     hudClock += dt;
     if (hudClock > 0.12) {
       updateHUD();
@@ -737,7 +1154,10 @@ renderer.setAnimationLoop((t, frame) => {
     environment.decorations.forEach(
       (o, i) => (o.visible = Math.sin(t * 0.023 + i * 2) > 0),
     );
-  if(humGain){humGain.gain.value=active&&!paused?C.audio.gain:0;hum.frequency.value=C.audio.humHz+velocity.length()*C.audio.speedHz;}
+  if (humGain) {
+    humGain.gain.value = active && !paused ? C.audio.gain : 0;
+    hum.frequency.value = C.audio.humHz + velocity.length() * C.audio.speedHz;
+  }
   xrFrame(frame);
   renderer.render(scene, camera);
 });
@@ -782,17 +1202,263 @@ if ("serviceWorker" in navigator)
     })
     .catch(() => {});
 
-function degradePhoto(out){const c=out.getContext('2d'),img=c.getImageData(0,0,out.width,out.height),gain=1+(Math.random()*2-1)*C.camera.exposureVariation;for(let i=0;i<img.data.length;i+=4){const noise=(Math.random()*2-1)*C.camera.noiseAmplitude;for(let j=0;j<3;j++)img.data[i+j]=Math.max(0,Math.min(255,img.data[i+j]*gain+noise));}c.putImageData(img,0,0);const blur=velocity.length()*C.camera.blurPxPerMps;if(blur>.1){const copy=document.createElement('canvas');copy.width=out.width;copy.height=out.height;copy.getContext('2d').drawImage(out,0,0);c.globalAlpha=.25;for(const sign of [-1,1])c.drawImage(copy,sign*blur,0);c.globalAlpha=1;}return out.toDataURL('image/jpeg',C.camera.jpegQuality);}
-function preflight(l){active=false;$('#panel').hidden=false;$('#panel').innerHTML=`<div class="eyebrow">PREVUELO / MPU6050 SIN MAGNETÓMETRO</div><h1>Base de calibración</h1><p>Dron quieto sobre H. Calibra durante ${C.imu.calibrationSeconds} s; sin calibración aumenta la deriva de yaw.</p><p><label><input id="checkBattery" type="checkbox"> Batería nueva / revisada</label></p><p><label><input id="checkSD" type="checkbox"> ${photos.length?'SD de vuelo vacía; fotos anteriores archivadas en tierra':'SD vacía y lista'}</label></p><button id="calibrate">Calibrar quieto ${C.imu.calibrationSeconds} s</button><p id="calState">Sin calibrar</p><button id="takeoff">Despegar sin calibrar</button>`;calibrated=false;let calibrating=false;$('#calibrate').onclick=async()=>{if(calibrating)return;calibrating=true;$('#calibrate').disabled=true;for(let i=C.imu.calibrationSeconds;i>0;i--){$('#calState').textContent=`Quieto en base… ${i} s`;await new Promise(r=>setTimeout(r,1000));if(!$('#calState'))return;}calibrated=true;$('#calState').textContent='Calibración terminada. Cabeceo/alabeo fiables; yaw aún deriva.';$('#takeoff').textContent='Despegar calibrado';calibrating=false;};$('#takeoff').onclick=()=>{if(calibrating)return;if(!$('#checkBattery').checked||!$('#checkSD').checked){$('#calState').textContent='Completa batería y SD antes de despegar.';return;}start(l);};}
-
-function showReport(){const expected=C.scenarios[level].expected,quality=photos.length?photos.reduce((s,p)=>s+p.quality.score,0)/photos.length/100:0,score=scoreSession({expected,decision:decisionRecord.decision,coverage:agentResult.coverage,quality,stats,photoCount:photos.length,goodCount:accepted()});decisionRecord.score=score;$('#result').innerHTML=`<h2>${decisionRecord.decision===null?'Informe parcial: INDETERMINADO':score.critical?'ERROR CRÍTICO: rojo clasificado como verde':decisionRecord.decision===expected?'Decisión acertada':'Decisión distinta al escenario'}</h2><p>Tu decisión: ${LABELS[decisionRecord.decision]??'INDETERMINADO'} · escenario: ${LABELS[expected]} · agente: ${agentResult.label}.</p><p>${decisionRecord.reason}</p><h3>Puntaje ${score.total}/100</h3><p>Decisión ${score.decision}/${C.score.decision} · fotos ${score.photography.toFixed(1)}/${C.score.photo} · eficiencia ${score.efficiency.toFixed(1)}/${C.score.efficiency} · seguridad ${score.safety.toFixed(1)}/${C.score.safety}</p><p>${C.scenarios[level].collapse?'Colapso modelado: no ingresar.':cases[level].explanation}</p><p>${DISCLAIMER}</p><h3>Informe: verdad de terreno revelada</h3><div class="report-table">${photos.map(p=>{const gt=truth.get(p.id),r=groundResults.find(r=>r.photoId===p.id),d=r?.detections.find(d=>!d.suspect&&d.measure.measurable),m=d?.measure,minimum=C.measurement.minPixels*scaleMmPerPixel(gt.distanceMm,gt.angleDeg),target=gt.widthMm*focalPixels()/C.measurement.minPixels*.8;return `<article><h4>Foto ${p.id} · ${p.name}</h4><p>Real: ${gt.widthMm.toFixed(2)} mm · medido: ${m?m.widthMm.toFixed(2)+' ± '+m.uncertaintyMm.toFixed(2)+' mm':'no medible / no detectado'}.</p><p>Distancia real ${gt.distanceMm.toFixed(0)} mm / láser ${p.sensors.laser.valid?p.sensors.laser.mm.toFixed(0)+' mm':'inválido'} · ángulo real ${gt.angleDeg.toFixed(1)}° / estimado ${p.sensors.imu.wallAngleDeg.toFixed(1)}°.</p><p>${p.quality.reasons.join(' ')||'Foto de calidad aceptada.'}</p><p>En esta distancia el mínimo de ${C.measurement.minPixels} píxeles equivale a ${minimum.toFixed(2)} mm. ${!m?target<C.laser.minMm?'Esta fisura queda fuera de la resolución/rango del sistema: requiere otro método.':`Acércate a ${(Math.min(target,C.laser.maxMm)/1000).toFixed(2)} m, centra un segmento y repite con luz y sin movimiento.`:'Revisa la incertidumbre antes de usar un umbral.'}</p></article>`;}).join('')}</div><p>Tiempo ${stats.seconds.toFixed(0)} s · salidas ${stats.flights} · roces ${stats.contacts} · choques ${stats.crashes}.</p><div id="exportArea"><p>Descarga imágenes SINTÉTICAS, no fotografías de edificios reales.</p><button id="downloadSession">Descargar ZIP: fotos + telemetría + verdad de terreno</button></div>`;$('#downloadSession').onclick=downloadSession;}
-
-function tickSensors(dt){sensorAccumulator+=dt;while(sensorAccumulator>=1/C.laser.hz){sensorAccumulator-=1/C.laser.hz;sensorCache=readSensors(Date.now()-sensorAccumulator*1000);lastSensorMs=performance.now();}}
-function initHum(){try{audio??=new AudioContext();audio.resume();if(!hum){hum=audio.createOscillator();humGain=audio.createGain();hum.type='sawtooth';hum.connect(humGain);humGain.connect(audio.destination);humGain.gain.value=C.audio.gain;hum.start();}}catch{}}
-function alertTone(){try{initHum();const o=audio.createOscillator(),g=audio.createGain();o.frequency.value=C.audio.alertHz;g.gain.setValueAtTime(.05,audio.currentTime);g.gain.exponentialRampToValueAtTime(.001,audio.currentTime+.3);o.connect(g);g.connect(audio.destination);o.start();o.stop(audio.currentTime+.3);}catch{}}
-function extras(dt){if(tutorialActive){let el=$('#tutorialHint');if(!el){el=document.createElement('div');el.id='tutorialHint';$('#hud').append(el);}const tips=['1/4 · W/S y A/D desplazan. Q/E controlan altura. Suelta para estabilizar.','2/4 · Mira el segmento marcado. F dispara tras 150 ms. Para capilares debes acercarte mucho.','3/4 · Entra por ACCESO. T enciende la luz. Usa el hueco al frente-derecha para subir.','4/4 · B guía a base; L aterriza. Solo en tierra se lee la SD y actúa el agente.'];el.textContent=tips[Math.min(tips.length-1,Math.floor(flightSeconds/C.tutorial.stepSeconds))];if(flightSeconds>=C.tutorial.seconds){tutorialActive=false;el.remove();try{localStorage.setItem('dse-tutorial-2','completo');}catch{}}}else $('#tutorialHint')?.remove();
- if(quakeEnabled&&!quakeDone&&flightSeconds>=C.quake.atSeconds){quakeDone=true;quakeLeft=C.quake.durationSeconds;for(const p of photos)p.preReplica=true;for(const p of points){p.best=null;p.state='pendiente tras réplica';}alertTone();toast('Réplica: la Fase 1 es provisional y debe repetirse. Repite los checkpoints después del evento.');for(let i=0;i<C.quake.debrisCount;i++){const m=new T.Mesh(new T.DodecahedronGeometry(.08),new T.MeshStandardMaterial({color:0x9a9686}));m.position.copy(rig.position).add(new T.Vector3((Math.random()-.5)*2,1+Math.random(),(Math.random()-.5)*2));world.add(m);fallingDebris.push(m);}}
- if(quakeLeft>0){quakeLeft-=dt;camera.rotation.z+=Math.sin(flightSeconds*40)*C.quake.shakeRad;lastImpact=performance.now();}for(const m of fallingDebris)if(m.position.y>.1)m.position.y=Math.max(.1,m.position.y-dt*2);
+function degradePhoto(out) {
+  const c = out.getContext("2d"),
+    img = c.getImageData(0, 0, out.width, out.height),
+    gain = 1 + (Math.random() * 2 - 1) * C.camera.exposureVariation;
+  for (let i = 0; i < img.data.length; i += 4) {
+    const noise = (Math.random() * 2 - 1) * C.camera.noiseAmplitude;
+    for (let j = 0; j < 3; j++)
+      img.data[i + j] = Math.max(
+        0,
+        Math.min(255, img.data[i + j] * gain + noise),
+      );
+  }
+  c.putImageData(img, 0, 0);
+  const blur = velocity.length() * C.camera.blurPxPerMps;
+  if (blur > 0.1) {
+    const copy = document.createElement("canvas");
+    copy.width = out.width;
+    copy.height = out.height;
+    copy.getContext("2d").drawImage(out, 0, 0);
+    c.globalAlpha = 0.25;
+    for (const sign of [-1, 1]) c.drawImage(copy, sign * blur, 0);
+    c.globalAlpha = 1;
+  }
+  return out.toDataURL("image/jpeg", C.camera.jpegQuality);
+}
+function preflight(l) {
+  rig.position.copy(environment.base);
+  rig.rotation.set(0, 0, 0);
+  camera.rotation.set(0, 0, 0);
+  velocity.set(0, 0, 0);
+  clearKeys();
+  active = false;
+  $("#panel").hidden = false;
+  $("#panel").innerHTML =
+    `<div class="eyebrow">PREVUELO / MPU6050 SIN MAGNETÓMETRO</div><h1>Base de calibración</h1><p>Dron quieto sobre H. Calibra durante ${C.imu.calibrationSeconds} s; sin calibración aumenta la deriva de yaw.</p><p><label><input id="checkBattery" type="checkbox"> Batería nueva / revisada</label></p><p><label><input id="checkSD" type="checkbox"> ${photos.length ? "SD de vuelo vacía; fotos anteriores archivadas en tierra" : "SD vacía y lista"}</label></p><button id="calibrate">Calibrar quieto ${C.imu.calibrationSeconds} s</button><p id="calState">Sin calibrar</p><button id="takeoff">Despegar sin calibrar</button>`;
+  calibrated = false;
+  let calibrating = false;
+  $("#calibrate").onclick = async () => {
+    if (calibrating) return;
+    calibrating = true;
+    $("#calibrate").disabled = true;
+    for (let i = C.imu.calibrationSeconds; i > 0; i--) {
+      $("#calState").textContent = `Quieto en base… ${i} s`;
+      await new Promise((r) => setTimeout(r, 1000));
+      if (!$("#calState")) return;
+    }
+    calibrated = true;
+    $("#calState").textContent =
+      "Calibración terminada. Cabeceo/alabeo fiables; yaw aún deriva.";
+    $("#takeoff").textContent = "Despegar calibrado";
+    calibrating = false;
+  };
+  $("#takeoff").onclick = () => {
+    if (calibrating) return;
+    if (!$("#checkBattery").checked || !$("#checkSD").checked) {
+      $("#calState").textContent = "Completa batería y SD antes de despegar.";
+      return;
+    }
+    start(l);
+  };
 }
 
-function downloadSession(){const report={synthetic:true,scenario:C.scenarios[level],agent:agentResult,decision:decisionRecord,stats,difficulty:difficultyKey,replica:quakeDone};const files=sessionFiles({photos,truth,report,config:C}),url=URL.createObjectURL(new Blob([zipStore(files)],{type:'application/zip'})),a=document.createElement('a');a.href=url;a.download='DSE-sesion-sintetica-'+Date.now()+'.zip';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}
+function showReport() {
+  const expected = C.scenarios[level].expected,
+    quality = photos.length
+      ? photos.reduce((s, p) => s + p.quality.score, 0) / photos.length / 100
+      : 0,
+    score = scoreSession({
+      expected,
+      decision: decisionRecord.decision,
+      coverage: agentResult.coverage,
+      quality,
+      stats,
+      photoCount: photos.length,
+      goodCount: accepted(),
+    });
+  decisionRecord.score = score;
+  $("#result").innerHTML =
+    `<h2>${decisionRecord.decision === null ? "Informe parcial: INDETERMINADO" : score.critical ? "ERROR CRÍTICO: rojo clasificado como verde" : decisionRecord.decision === expected ? "Decisión acertada" : "Decisión distinta al escenario"}</h2><p>Tu decisión: ${LABELS[decisionRecord.decision] ?? "INDETERMINADO"} · escenario: ${LABELS[expected]} · agente: ${agentResult.label}.</p><p>${decisionRecord.reason}</p><h3>Puntaje ${score.total}/100</h3><p>Decisión ${score.decision}/${C.score.decision} · fotos ${score.photography.toFixed(1)}/${C.score.photo} · eficiencia ${score.efficiency.toFixed(1)}/${C.score.efficiency} · seguridad ${score.safety.toFixed(1)}/${C.score.safety}</p><p>${C.scenarios[level].collapse ? "Colapso modelado: no ingresar." : cases[level].explanation}</p><p>${DISCLAIMER}</p><h3>Informe: verdad de terreno revelada</h3><div class="report-table">${photos
+      .map((p) => {
+        const gt = truth.get(p.id),
+          r = groundResults.find((r) => r.photoId === p.id),
+          d = r?.detections.find((d) => !d.suspect && d.measure.measurable),
+          m = d?.measure,
+          minimum =
+            C.measurement.minPixels *
+            scaleMmPerPixel(gt.distanceMm, gt.angleDeg),
+          target =
+            ((gt.widthMm * focalPixels()) / C.measurement.minPixels) * 0.8;
+        return `<article><h4>Foto ${p.id} · ${p.name}</h4><p>Real: ${gt.widthMm.toFixed(2)} mm · medido: ${m ? m.widthMm.toFixed(2) + " ± " + m.uncertaintyMm.toFixed(2) + " mm" : "no medible / no detectado"}.</p><p>Distancia real ${gt.distanceMm.toFixed(0)} mm / láser ${p.sensors.laser.valid ? p.sensors.laser.mm.toFixed(0) + " mm" : "inválido"} · ángulo real ${gt.angleDeg.toFixed(1)}° / estimado ${p.sensors.imu.wallAngleDeg.toFixed(1)}°.</p><p>${p.quality.reasons.join(" ") || "Foto de calidad aceptada."}</p><p>En esta distancia el mínimo de ${C.measurement.minPixels} píxeles equivale a ${minimum.toFixed(2)} mm. ${!m ? (target < C.laser.minMm ? "Esta fisura queda fuera de la resolución/rango del sistema: requiere otro método." : `Acércate a ${(Math.min(target, C.laser.maxMm) / 1000).toFixed(2)} m, centra un segmento y repite con luz y sin movimiento.`) : "Revisa la incertidumbre antes de usar un umbral."}</p></article>`;
+      })
+      .join(
+        "",
+      )}</div><p>Tiempo ${stats.seconds.toFixed(0)} s · salidas ${stats.flights} · roces ${stats.contacts} · choques ${stats.crashes}.</p><div id="exportArea"><p>Descarga imágenes SINTÉTICAS, no fotografías de edificios reales.</p><button id="downloadSession">Descargar ZIP: fotos + telemetría + verdad de terreno</button></div>`;
+  $("#downloadSession").onclick = downloadSession;
+}
+
+function tickSensors(dt) {
+  sensorAccumulator += dt;
+  while (sensorAccumulator >= 1 / C.laser.hz) {
+    sensorAccumulator -= 1 / C.laser.hz;
+    sensorCache = readSensors(Date.now() - sensorAccumulator * 1000);
+    lastSensorMs = performance.now();
+  }
+}
+function initHum() {
+  try {
+    audio ??= new AudioContext();
+    audio.resume();
+    if (!hum) {
+      hum = audio.createOscillator();
+      humGain = audio.createGain();
+      hum.type = "sawtooth";
+      hum.connect(humGain);
+      humGain.connect(audio.destination);
+      humGain.gain.value = C.audio.gain;
+      hum.start();
+    }
+  } catch {}
+}
+function alertTone() {
+  try {
+    initHum();
+    const o = audio.createOscillator(),
+      g = audio.createGain();
+    o.frequency.value = C.audio.alertHz;
+    g.gain.setValueAtTime(C.audio.alertGain, audio.currentTime);
+    g.gain.exponentialRampToValueAtTime(
+      0.001,
+      audio.currentTime + C.audio.alertSeconds,
+    );
+    o.connect(g);
+    g.connect(audio.destination);
+    o.start();
+    o.stop(audio.currentTime + C.audio.alertSeconds);
+  } catch {}
+}
+function extras(dt) {
+  if (tutorialActive) {
+    let el = $("#tutorialHint");
+    if (!el) {
+      el = document.createElement("div");
+      el.id = "tutorialHint";
+      $("#hud").append(el);
+    }
+    const tips = [
+      "1/4 · W/S y A/D desplazan. Q/E controlan altura. Suelta para estabilizar.",
+      "2/4 · Mira el segmento marcado. F dispara tras 150 ms. Para capilares debes acercarte mucho.",
+      "3/4 · Entra por ACCESO. T enciende la luz. Usa el hueco al frente-derecha para subir.",
+      "4/4 · B guía a base; L aterriza. Solo en tierra se lee la SD y actúa el agente.",
+    ];
+    el.textContent =
+      tips[
+        Math.min(
+          tips.length - 1,
+          Math.floor(flightSeconds / C.tutorial.stepSeconds),
+        )
+      ];
+    if (flightSeconds >= C.tutorial.seconds) {
+      tutorialActive = false;
+      el.remove();
+      try {
+        localStorage.setItem("dse-tutorial-2", "completo");
+      } catch {}
+    }
+  } else $("#tutorialHint")?.remove();
+  if (quakeEnabled && !quakeDone && flightSeconds >= C.quake.atSeconds) {
+    quakeDone = true;
+    quakeLeft = C.quake.durationSeconds;
+    for (const p of photos) p.preReplica = true;
+    for (const p of points) {
+      p.best = null;
+      p.state = "pendiente tras réplica";
+    }
+    alertTone();
+    toast(
+      "Réplica: la Fase 1 es provisional y debe repetirse. Repite los checkpoints después del evento.",
+    );
+    for (let i = 0; i < C.quake.debrisCount; i++) {
+      const m = new T.Mesh(
+        new T.DodecahedronGeometry(C.quake.debrisRadiusM),
+        new T.MeshStandardMaterial({ color: 0x9a9686 }),
+      );
+      m.position
+        .copy(rig.position)
+        .add(
+          new T.Vector3(
+            (Math.random() - 0.5) * C.quake.debrisSpreadM,
+            1 + Math.random(),
+            (Math.random() - 0.5) * C.quake.debrisSpreadM,
+          ),
+        );
+      world.add(m);
+      fallingDebris.push(m);
+    }
+  }
+  if (quakeLeft > 0) {
+    quakeLeft -= dt;
+    camera.rotation.z +=
+      Math.sin(flightSeconds * C.quake.shakeHz) * C.quake.shakeRad;
+    lastImpact = performance.now();
+  }
+  for (const m of fallingDebris)
+    if (m.position.y > 0.1)
+      m.position.y = Math.max(0.1, m.position.y - dt * C.quake.debrisSpeedMps);
+}
+
+function downloadSession() {
+  const report = {
+    synthetic: true,
+    scenario: C.scenarios[level],
+    agent: agentResult,
+    decision: decisionRecord,
+    stats,
+    difficulty: difficultyKey,
+    replica: quakeDone,
+  };
+  const files = sessionFiles({ photos, truth, report, config: C }),
+    url = URL.createObjectURL(
+      new Blob([zipStore(files)], { type: "application/zip" }),
+    ),
+    a = document.createElement("a");
+  a.href = url;
+  a.download = "DSE-sesion-sintetica-" + Date.now() + ".zip";
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+function captureRegion(p) {
+  const c = new T.PerspectiveCamera(
+    VFOV,
+    C.camera.width / C.camera.height,
+    0.04,
+    180,
+  );
+  cam().getWorldPosition(c.position);
+  cam().getWorldQuaternion(c.quaternion);
+  c.updateMatrixWorld(true);
+  const tangent = new T.Vector3().crossVectors(up, p.normal).normalize(),
+    v = [];
+  for (const x of [-C.quality.roiHalfWidthM, C.quality.roiHalfWidthM])
+    for (const y of [-C.quality.roiHalfHeightM, C.quality.roiHalfHeightM])
+      v.push(
+        p.position
+          .clone()
+          .addScaledVector(tangent, x)
+          .addScaledVector(up, y)
+          .project(c),
+      );
+  const minX = Math.max(0, Math.min(...v.map((p) => (p.x + 1) / 2))),
+    maxX = Math.min(1, Math.max(...v.map((p) => (p.x + 1) / 2))),
+    minY = Math.max(0, Math.min(...v.map((p) => (1 - p.y) / 2))),
+    maxY = Math.min(1, Math.max(...v.map((p) => (1 - p.y) / 2)));
+  return {
+    x: minX,
+    y: minY,
+    w: Math.max(0, maxX - minX),
+    h: Math.max(0, maxY - minY),
+  };
+}

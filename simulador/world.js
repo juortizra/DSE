@@ -1,3 +1,4 @@
+import { CONFIG as C } from "./config.js";
 import * as T from "./vendor/three.module.js";
 // Metros en todo el mundo. Los anchos de fisura se convierten explícitamente de mm a m.
 export function createWorld(level = 0, interiors = false) {
@@ -7,14 +8,14 @@ export function createWorld(level = 0, interiors = false) {
     hazards = [],
     textures = [],
     decorations = [];
-  const floors = [2, 4, 5][level],
-    W = [10, 14, 16][level],
-    D = [8, 10, 12][level],
-    H = 3,
-    fz = -5,
+  const floors = C.world.floors[level],
+    W = C.world.widthsM[level],
+    D = C.world.depthsM[level],
+    H = C.world.floorHeightM,
+    fz = C.world.frontZ,
     bz = fz - D,
     height = floors * H,
-    base = new T.Vector3(0, 0.45, 10);
+    base = new T.Vector3(...C.world.base);
   let seed = 177 + level * 91;
   const rand = () => {
     seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
@@ -112,7 +113,7 @@ export function createWorld(level = 0, interiors = false) {
     m.receiveShadow = true;
     group.add(m);
     if (solid) colliders.push(m);
-    if(color==="#335661")m.userData.glass=true;
+    if (color === "#335661") m.userData.glass = true;
     return m;
   }
   function rod(a, b, r, color, solid = false) {
@@ -120,10 +121,11 @@ export function createWorld(level = 0, interiors = false) {
       m = new T.Mesh(new T.CylinderGeometry(r, r, v.length(), 7), mat(color));
     m.position.copy(a).add(b).multiplyScalar(0.5);
     m.quaternion.setFromUnitVectors(new T.Vector3(0, 1, 0), v.normalize());
+    m.userData.sensorTarget = true;
     m.castShadow = true;
     group.add(m);
     if (solid) colliders.push(m);
-    if(color==="#335661")m.userData.glass=true;
+    if (color === "#335661") m.userData.glass = true;
     return m;
   }
   function polyline(vertices, r, color) {
@@ -159,6 +161,7 @@ export function createWorld(level = 0, interiors = false) {
     normal = new T.Vector3(0, 0, 1),
     pattern = "diagonal",
   ) {
+    width = C.scenarios[level].widths[points.length] ?? width;
     const p = {
       name,
       position: new T.Vector3(x, y, z),
@@ -379,10 +382,34 @@ export function createWorld(level = 0, interiors = false) {
   }
   // Fisuras exteriores: superficies no obstruidas, frente a paños y columnas.
   if (level === 0) {
-    point("E1 · Friso bajo ventana", -W / 3, 0.6, fz + 0.151, 0.2);
-    point("E2 · Paño de ladrillo", -1.55, 1.5, fz + 0.151, 0.35);
-    point("E3 · Friso planta alta", 1.55, 4.4, fz + 0.151, 0.5);
-    point("E4 · Encuentro de fachada", W / 3, 3.6, fz + 0.151, 0.3);
+    point(
+      "E1 · Friso bajo ventana",
+      -W / 3,
+      0.6,
+      fz + 0.14 + C.quality.surfaceEpsilonM,
+      0.2,
+    );
+    point(
+      "E2 · Paño de ladrillo",
+      -1.55,
+      1.5,
+      fz + 0.14 + C.quality.surfaceEpsilonM,
+      0.35,
+    );
+    point(
+      "E3 · Friso planta alta",
+      1.55,
+      4.4,
+      fz + 0.14 + C.quality.surfaceEpsilonM,
+      0.5,
+    );
+    point(
+      "E4 · Encuentro de fachada",
+      W / 3,
+      3.6,
+      fz + 0.14 + C.quality.surfaceEpsilonM,
+      0.3,
+    );
     for (let i = 0; i < 5; i++) {
       const stain = box(
         0.45,
@@ -405,7 +432,7 @@ export function createWorld(level = 0, interiors = false) {
       "E1 · Muro con fisuración diagonal",
       -W / 2 + bay * 0.5,
       0.52,
-      fz + 0.151,
+      fz + 0.14 + C.quality.surfaceEpsilonM,
       2.1,
       false,
       undefined,
@@ -413,20 +440,26 @@ export function createWorld(level = 0, interiors = false) {
     );
     point(
       "E2 · Paño de planta 2",
-      -1.1,
+      C.inspection.yellowWallX,
       4.4,
-      fz + 0.151,
+      fz + 0.14 + C.quality.surfaceEpsilonM,
       2.7,
       false,
       undefined,
       "x",
     );
-    point("E3 · Columna de esquina", W / 2, 1.45, fz + 0.301, 3);
+    point(
+      "E3 · Columna de esquina",
+      W / 2,
+      C.inspection.yellowColumnY,
+      fz + 0.29 + C.quality.surfaceEpsilonM,
+      3,
+    );
     point(
       "E4 · Paño bajo ventana",
       W / 2 - bay * 0.5,
       6.5,
-      fz + 0.151,
+      fz + 0.14 + C.quality.surfaceEpsilonM,
       2.4,
       false,
       undefined,
@@ -437,21 +470,33 @@ export function createWorld(level = 0, interiors = false) {
       "E1 · Columna fisurada del piso blando",
       -W / 2,
       1.45,
-      fz + 0.301,
+      fz + 0.29 + C.quality.surfaceEpsilonM,
       14,
     );
     point(
       "E2 · Muro diagonal planta 2",
-      -1,
+      C.inspection.redWallX,
       4.45,
-      fz + 0.151,
+      fz + 0.14 + C.quality.surfaceEpsilonM,
       18,
       false,
       undefined,
       "x",
     );
-    point("E3 · Junta desplazada planta 3", W / 2 - 2, 6.5, fz + 0.151, 11);
-    point("E4 · Columna con pérdida de sección", 0, 1.45, fz + 0.301, 22);
+    point(
+      "E3 · Junta desplazada planta 3",
+      W / 2 - 2,
+      6.5,
+      fz + 0.14 + C.quality.surfaceEpsilonM,
+      11,
+    );
+    point(
+      "E4 · Columna con pérdida de sección",
+      0,
+      C.inspection.redColumnY,
+      fz + 0.29 + C.quality.surfaceEpsilonM,
+      22,
+    );
   }
   if (level >= 1) {
     const cx = level === 1 ? W / 2 : 0;
@@ -586,7 +631,7 @@ export function createWorld(level = 0, interiors = false) {
       "I1 · Divisorio interior / planta baja",
       -W / 2 + 1.1,
       1.5,
-      partitionZ + 0.091,
+      partitionZ + 0.08 + C.quality.surfaceEpsilonM,
       [0.3, 2.6, 12][level],
       true,
       undefined,
@@ -596,7 +641,7 @@ export function createWorld(level = 0, interiors = false) {
       "I2 · Muro posterior / planta baja",
       0.65,
       1.5,
-      bz + 0.151,
+      bz + 0.14 + C.quality.surfaceEpsilonM,
       [0.4, 2.3, 16][level],
       true,
     );
@@ -604,7 +649,7 @@ export function createWorld(level = 0, interiors = false) {
       "I3 · Muro interior / planta 2",
       0.65,
       4.5,
-      bz + 0.151,
+      bz + 0.14 + C.quality.surfaceEpsilonM,
       [0.25, 2.9, 21][level],
       true,
       undefined,

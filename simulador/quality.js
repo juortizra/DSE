@@ -1,4 +1,4 @@
-import {CONFIG as C} from "./config.js";
+import { CONFIG as C } from "./config.js";
 // Límites de fotografía del juego, NO especificaciones certificadas del sensor.
 export function photoQuality({
   distance,
@@ -46,12 +46,17 @@ export function photoQuality({
   const clamp = (x) => Math.max(0, Math.min(1, x));
   let score = Math.round(
     100 *
-      (0.25 * clamp(1 - Math.abs(distance - 0.8) / 1.5) +
-        0.2 * clamp(1 - angle / 60) +
-        0.2 * clamp(1 - speed / 2) +
-        0.15 * clamp(light) +
-        0.2 * (framed && visible ? 1 : 0)),
+      (C.quality.weights.distance *
+        clamp(
+          1 -
+            Math.abs(distance - C.quality.preferredDistanceM) /
+              C.quality.distanceScaleM,
+        ) +
+        C.quality.weights.angle * clamp(1 - angle / C.quality.angleScaleDeg) +
+        C.quality.weights.speed * clamp(1 - speed / C.quality.speedScaleMps) +
+        C.quality.weights.light * clamp(light) +
+        C.quality.weights.framing * (framed && visible ? 1 : 0)),
   );
-  if (reasons.length) score = Math.min(C.quality.accepted-1, score);
+  if (reasons.length) score = Math.min(C.quality.accepted - 1, score);
   return { score, accepted: score >= C.quality.accepted, reasons };
 }
