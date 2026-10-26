@@ -32,8 +32,8 @@ export function createWorld(level=0,interiors=false){
   for(const side of [-1,1])box(.28,H,D,side*W/2,y+H/2,(fz+bz)/2,level===0?'brick':'peeling');
   box(W,H,.28,0,y+H/2,bz,level===0?'plaster':'peeling');
   // Losas: el hueco de escalera interior se añade en 1C.
-  if(!interiors||floor===0)box(W+.4,.2,D+.4,0,y+H,(fz+bz)/2,'concrete');
-  else {const holeX=W/2-1.7;box(W-3.4,.2,D, -1.7,y+H,(fz+bz)/2,'concrete');box(3.4,.2,D-3.4,holeX,y+H,(fz+bz+3.4)/2,'concrete');}
+  if(!interiors||floor===floors-1)box(W+.4,.2,D+.4,0,y+H,(fz+bz)/2,'concrete');
+  else {const holeX=W/2-1.7;box(W-3.4,.2,D, -1.7,y+H,(fz+bz)/2,'concrete');box(3.4,.2,D-3.4,holeX,y+H,(fz+bz-3.4)/2,'concrete');}
   if(level>0){for(let j=0;j<=bays;j++){const x=-W/2+j*bay;if(!(soft&&j===bays)){const col=box(.44,H,.5,x,y+H/2,fz+.04,'concrete');if(soft&&j===bays-1)col.rotation.z=.16;}box(.42,H,.42,x,y+H/2,bz,'concrete');}box(W+.4,.34,.5,0,y+H-.08,fz+.04,'concrete');}
  }
  if(level===0){for(const sign of [-1,1]){const roof=box(W/2+.7,.16,D+1,sign*(W/4),height+.65,(fz+bz)/2,'#9d533d');roof.rotation.z=-sign*.24;}box(.22,.2,D+1,0,height+1.28,(fz+bz)/2,'#a86846');box(1,.7,1,-2,height+.8,bz+2,'brick');}
@@ -52,6 +52,41 @@ export function createWorld(level=0,interiors=false){
   for(let i=0;i<3;i++){const broken=box(.55,1.4,.55,W/2-i*.5,.8,fz,'concrete');broken.rotation.z=.65;}
   debris(W/2+1,0,36,9);debris(-2,-1,20,5);const hazard=box(2.5,.25,2.3,3,.65,fz-2,'concrete');hazard.rotation.z=.3;hazards.push(new T.Box3().setFromObject(hazard));
  }
+
+ if(interiors){
+  // Pasillo longitudinal libre, divisiones a la izquierda y hueco vertical de 3,4 m al frente-derecha.
+  const partitionZ=fz-D*.54;
+  for(let f=0;f<floors;f++){
+   const y=f*H;
+   box(W/2-1,2.75,.16,-W/4-.5,y+1.5,partitionZ,'peeling');
+   box(.16,2.75,D*.3,-W/4,y+1.5,bz+D*.15,'plaster');
+   // Mobiliario fuera del pasillo y de la línea de tiro de los checkpoints.
+   const table=box(1.3,.12,.65,-W/2+1.1,y+.75,partitionZ+1,'wood');
+   for(const dx of [-.5,.5])box(.07,.7,.5,-W/2+1.1+dx,y+.37,partitionZ+1,'wood');
+   const chair=box(.55,.6,.55,-W/2+2,y+.35,partitionZ+1.4,'#5d6b60');chair.rotation.z=.5;
+   box(1.6,.7,.7,-W/2+1,y+.4,bz+1,'#6e7367');
+   // Escalones truncados a un lado del hueco: el dron asciende por el espacio libre adyacente.
+   if(f<floors-1){for(let j=0;j<6;j++)box(.65,.12,.35,W/2-.6,y+.35+j*.4,fz-.5-j*.42,'concrete');
+    box(.06,.5,2.7,W/2-3.45,y+3.3,fz-1.9,'#778773');}
+   if(level>=1){box(.42,H,.42, -W/2+2,y+1.5,partitionZ-.3,'concrete');if(f===0){box(.46,.65,.05,-W/2+2,1.3,partitionZ-.06,'#574e42',false);for(let k=-1;k<=1;k++)rod(new T.Vector3(-W/2+2+k*.1,.9,partitionZ-.02),new T.Vector3(-W/2+2+k*.1,1.8,partitionZ-.02),.012,'#72513e');}}
+   if(level>0)debris(-W/2+1,partitionZ+1,5+level*3,1.5);
+  }
+  point('I1 · Divisorio interior / planta baja',-W/2+1.1,1.5,partitionZ+.091,[.3,2.6,12][level],true,undefined,level?'x':'diagonal');
+  point('I2 · Muro posterior / planta baja',.65,1.5,bz+.151,[.4,2.3,16][level],true);
+  point('I3 · Muro interior / planta 2',.65,4.5,bz+.151,[.25,2.9,21][level],true,undefined,level?'x':'diagonal');
+  if(level>=1){
+   // Grieta geométrica en losa: orientada en horizontal, sin líneas de ancho artificial.
+   for(let j=0;j<7;j++){const m=box(.003+level*.004,.002,.24,-2+j*.15,3.112,bz+2+j*.15,'#282d28',false);m.rotation.y=.4;}
+  }
+  if(level===2){
+   const fallen=box(2.1,.2,2,-W/2+1.8,2.1,partitionZ-1,'concrete');fallen.rotation.z=.28;hazards.push(new T.Box3().setFromObject(fallen));
+   for(let j=0;j<6;j++){const stripe=box(.23,.012,.15,-W/2+.8+j*.36,.19,partitionZ+.2,j%2?'#222c2a':'#e8b650',false);}
+  }
+  // Indicador de acceso sin revelar la clasificación.
+  const doorX=-W/2+((level===2?1:Math.floor(bays/2))+.5)*bay;
+  const signCanvas=document.createElement('canvas');signCanvas.width=512;signCanvas.height=128;const sc=signCanvas.getContext('2d');sc.fillStyle='#21483e';sc.fillRect(0,0,512,128);sc.fillStyle='#e4eed2';sc.font='bold 35px sans-serif';sc.textAlign='center';sc.fillText('ACCESO → INTERIOR',256,78);const sign=new T.Mesh(new T.PlaneGeometry(1.8,.45),new T.MeshBasicMaterial({map:new T.CanvasTexture(signCanvas)}));sign.position.set(doorX,2.7,fz+.2);group.add(sign);
+ }
+
  // Base de despegue: carpa, mesa, equipo y zona H.
  box(3.8,.05,3.8,base.x,.035,base.z,'#d4e9a4',false);const label=document.createElement('canvas');label.width=label.height=256;const lc=label.getContext('2d');lc.fillStyle='#193e41';lc.font='bold 180px sans-serif';lc.textAlign='center';lc.fillText('H',128,194);const hm=new T.Mesh(new T.PlaneGeometry(2.3,2.3),new T.MeshBasicMaterial({map:new T.CanvasTexture(label),transparent:true}));hm.rotation.x=-Math.PI/2;hm.position.set(base.x,.069,base.z);group.add(hm);
  const tentX=-6,tentZ=11;for(const x of [-2,2])for(const z of [-1.7,1.7])box(.07,2.7,.07,tentX+x,1.35,tentZ+z,'#c6cfc3');const tent=box(4.6,.12,4.1,tentX,2.75,tentZ,'#e5d9b2');tent.rotation.z=.04;box(2,.13,.9,tentX,.9,tentZ,'wood');for(const x of [-.8,.8])box(.06,.9,.65,tentX+x,.45,tentZ,'#34494c');box(.8,.55,.08,tentX,1.25,tentZ-.12,'#203b40');box(.64,.37,.02,tentX,1.25,tentZ-.06,'#8ed0ae',false);box(.4,.18,.3,tentX+.75,1.08,tentZ,'#8b9894');
@@ -61,7 +96,7 @@ export function createWorld(level=0,interiors=false){
  function car(x,z,c){box(1.7,.65,3.4,x,.55,z,c);box(1.5,.65,1.7,x,1.12,z-.15,'#536c73');box(1.52,.05,1.75,x,1.47,z-.15,c);for(const a of [-.8,.8])for(const b of [-1.05,1.05]){const wheel=new T.Mesh(new T.CylinderGeometry(.31,.31,.17,12),mat('#242c2b'));wheel.rotation.z=Math.PI/2;wheel.position.set(x+a,.35,z+b);group.add(wheel);}}
  car(-11,2,'#b6b99f');car(13,2,level===2?'#925e49':'#527877');
  function tree(x,z){box(.23,2.6,.23,x,1.3,z,'wood');for(let i=0;i<3;i++){const leaf=new T.Mesh(new T.IcosahedronGeometry(1.25,1),mat(i%2?'#6f8862':'#526f53'));leaf.position.set(x+(i-1)*.5,2.7+i*.4,z);group.add(leaf);}}
- for(let i=0;i<5;i++)tree(-18+i*8,bz-5);if(level===0){box(W+1,.18,2.2,0,.04,fz+1.5,'#6b8656');for(let i=0;i<7;i++){const bush=new T.Mesh(new T.IcosahedronGeometry(.35,1),mat('#667c4d'));bush.position.set(-4+i*1.3,.4,fz+1.7);group.add(bush);}box(1.8,.04,3.4,0,.16,fz+1.5,'concrete');}
+ for(let i=0;i<5;i++)tree(-18+i*8,bz-5);if(level===0){box(W+1,.18,2.2,0,.04,fz+1.5,'#6b8656');for(let i=0;i<7;i++){if(Math.abs(-4+i*1.3)<1.1)continue;const bush=new T.Mesh(new T.IcosahedronGeometry(.35,1),mat('#667c4d'));bush.position.set(-4+i*1.3,.4,fz+1.7);group.add(bush);}box(1.8,.04,3.4,0,.16,fz+1.5,'concrete');}
  if(level>0)debris(-W/2-1,fz+1.4,12+level*6,4);
  for(const x of [-26,25])box(7,8+level*2,8,x,4+level,bz+2,'#87938b');
  return {group,colliders,points,base,height,hazards,textures,decorations,sky:['#bcd5db','#b5b4a4','#8a939b'][level],light:[1,.8,.6][level],indoor:p=>p.x>-W/2&&p.x<W/2&&p.z<fz-.3&&p.z>bz+.3&&p.y<height,interiors,dimensions:{W,D,fz,bz,floors}};
