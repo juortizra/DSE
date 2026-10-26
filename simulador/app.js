@@ -153,7 +153,7 @@ function start(l) {
   camera.rotation.set(0, 0, 0);
   yaw = pitch = bank = tilt = 0;
   velocity.set(0, 0, 0);
-  if(!resumeSortie){photos=[];truth.clear();sortie=1;stats={seconds:0,batteryUsed:0,flights:0,contacts:0,crashes:0,boundaries:0};decisionRecord=null;quakeDone=false;}else {sortie++;for(const p of photos.filter(p=>p.quality.accepted)){if(points[p.point]){points[p.point].best=p;points[p.point].state='aceptada';}}}resumeSortie=false;flightSeconds=0;flightToken++;sensorCache=null;
+  if(!resumeSortie){photos=[];truth.clear();sortie=1;stats={seconds:0,batteryUsed:0,flights:0,contacts:0,crashes:0,boundaries:0};decisionRecord=null;quakeDone=false;}else {sortie++;for(const p of photos.filter(p=>p.quality.accepted&&!p.preReplica)){if(points[p.point]){points[p.point].best=p;points[p.point].state='aceptada';}}}resumeSortie=false;flightSeconds=0;flightToken++;sensorCache=null;
   chosen = 0;
   lastShot = -Infinity;
   lastImpact = -Infinity;
@@ -725,7 +725,7 @@ renderer.setAnimationLoop((t, frame) => {
   const dt = Math.min((t - last) / 1000 || 0, 0.05);
   last = t;
   if (active && !paused) {
-    move(dt);
+    move(dt);extras(dt);
     hudClock += dt;
     if (hudClock > 0.12) {
       updateHUD();
