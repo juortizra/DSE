@@ -1,34 +1,40 @@
-# DSE · Simulador educativo
+# DSE · Inspección postsismo con dron
 
-**URL prevista al habilitar Pages:** https://juortizra.github.io/DSE/
+**Jugar:** https://juortizra.github.io/DSE/ — navegador de escritorio, sin cuenta ni instalación.
 
-No requiere cuenta, instalación ni comandos. Todo el código y Three.js se sirven desde el sitio; no hay CDN, telemetría ni servicios externos. Después de la primera carga completa en HTTPS, el service worker permite jugar offline (salvo que el navegador borre la caché). Las fotos viven en memoria: recargar las elimina.
+## Cómo jugar
+Selecciona un sitio → lee el briefing → despega → fotografía 4 puntos exteriores y 3 interiores → regresa a H → aterriza → analiza la SD → decide verde, amarillo o rojo.
 
-## Publicar (requiere propietario)
-1. En https://github.com/juortizra/DSE/settings/pages elige **Build and deployment → Source → GitHub Actions**.
-2. Si el entorno bloquea la rama: **Settings → Environments → github-pages → Deployment branches and tags**, permite `arena/c1eed267-dse` (Selected branches and tags → Add deployment branch or tag rule).
-3. **Actions → Publicar simulador → Run workflow → Branch: arena/c1eed267-dse → Run workflow**. Espera el resultado verde y abre la URL anterior. Si los workflows de esta rama no aparecen, abre el último run fallido y usa **Re-run all jobs**.
+| Control | Acción |
+|---|---|
+| W / S · A / D | Avanzar/retroceder · desplazamiento lateral |
+| Q / E | Bajar / subir |
+| Ratón (clic en escena) o ← / → | Girar; Esc libera el ratón |
+| ↑ / ↓ | Inclinar orientación de cámara/cuerpo |
+| F | Foto real renderizada, intervalo mínimo de 1 segundo |
+| G | Galería de aceptadas y rechazadas; pausa la misión |
+| T | Luz del módulo, necesaria en interiores oscuros |
+| B | Guía hacia base (no piloto automático) |
+| L | Aterrizar en H, altura <0,75 m y velocidad <0,3 m/s |
+| P | Pausa / continuar |
 
-Estado al entregar: Pages ya aparece habilitado, pero el entorno `github-pages` solo autoriza la rama `main`. El despliegue desde `arena/c1eed267-dse` fue bloqueado. La integración recibió HTTP 403 al intentar añadir esa rama. Completa el paso 2 y vuelve a ejecutar el workflow. La URL todavía no tiene una publicación comprobada. El workflow también admite `main` si posteriormente integras estos cambios allí.
+**Captura:** acércate a 0,45–1,2 m, sitúate de frente y suelta los controles. Centra el círculo completo. Se acepta con calidad ≥60%; los rechazos explican distancia, ángulo, movimiento, oscuridad, encuadre u oclusión. Selecciona un punto en la lista para repetirlo. G muestra todos los disparos con calidad; haz clic en una imagen para ampliarla.
 
-## Controles
-Elige misión. Clic en la escena captura el ratón; Esc lo libera. WASD mueve horizontalmente; Q baja, E sube; ratón o flechas orientan. F fotografía; L aterriza. También hay botones visibles. Sin controles táctiles ni gamepad de escritorio.
+**Interiores:** entra por ACCESO. El hueco de ascenso al segundo piso está al frente-derecha visto desde la calle. Usa el pasillo central y evita escombros. Un choque a velocidad >1,7 m/s termina el vuelo; un roce invalida la estabilidad 1,5 s. Las fotos se conservan en el análisis, pero un vuelo incompleto no permite emitir veredicto.
 
-Hay cinco círculos: el activo es verde lima. Lee su altura y distancia en la guía. Acércate entre 1,2 y 4 m, centra el círculo, iguala su altura y suelta los controles hasta velocidad <0,35 m/s. Tras las cinco fotos, vuelve a H (x=0, z=8), baja de 0,8 m y pulsa L. La batería dura aproximadamente 13 minutos efectivos. Volver a Misiones reinicia todo.
+## Qué simula y qué no
+- Tres edificios distintos: vivienda de dos pisos, apartamentos de cuatro y edificio de cinco con piso blando. Texturas procedurales locales, daños, obstáculos y base con carpa/unidad de tierra.
+- Cámara fija al cuerpo con inclinación al desplazarse, velocidad limitada a 2,4 m/s y mantenimiento de altura al soltar controles. Colisionadores AABB y movimiento subdividido; no es un modelo aerodinámico.
+- SD en memoria: fotografías reales de la cámara virtual a 1920×1080 y metadatos de captura. Recargar o abandonar borra la sesión. No se transmiten datos; video/HUD son la interfaz del juego.
+- IA y agente **sintéticos**, no un modelo entrenado: resolución óptica ideal, anchos conocidos del escenario y margen orientativo. Las grietas son geometría con ancho en metros convertido desde mm; las más finas apenas se ven. Los anchos por sí solos no determinan seguridad.
+- La luz del módulo, rango de juego del láser y reglas de calidad son ayudas educativas, no validación física del VL53L0X ni reglas oficiales colombianas.
 
-## Qué simula
-- Vuelo FPV: velocidad limitada a 3 m/s, amortiguación, altura limitada, colisiones simplificadas. HUD y video son una interfaz de juego, no transmisión del módulo añadido.
-- SD virtual: fotos, distancia láser e inclinación, sin subir ni analizar nada durante el vuelo.
-- Raspberry Pi: análisis **sintético**, sin modelo de IA. Modelo óptico pinhole ideal a 1920 px/FOV 65°, sin calibración real; las fisuras finas pueden quedar sin resolver. La captura de pantalla puede tener otra resolución: se usa una cámara virtual de referencia, no medición de píxeles reales.
-- Agente: reglas didácticas sobre daño localizado y colapso; no clasifica edificios reales ni reproduce umbrales oficiales de la metodología colombiana. El ancho solo no determina seguridad. Tres escenarios con anchos conocidos; error orientativo y explicación al decidir.
-- No se modelan vibraciones, distorsión, viento ni límites físicos reales del VL53L0X. Su rango utilizable real debe validarse en hardware; el rango de juego es una simplificación.
+**Simulación educativa. La clasificación oficial la hace el evaluador certificado.** Es apoyo de triage, no autorización para entrar a edificios dañados.
 
-**Simulación educativa. La clasificación oficial la hace el evaluador certificado.** No entrar a estructuras dañadas para obtener datos sin autorización profesional.
+## Sin conexión y actualizaciones
+Todos los recursos se sirven desde el sitio, sin CDN ni servicios externos. Tras una carga completa, el service worker guarda la aplicación para uso offline. La caché depende del navegador. Si aparece una versión anterior, cierra **todas** las pestañas DSE y vuelve a abrir. Las versiones nuevas muestran un aviso para actualizar sin reemplazar archivos a mitad de un vuelo.
 
-## Meta Quest / WebXR (experimental, sin prueba física)
-Mismo enlace HTTPS → inicia misión → **Entrar en VR/MR**. Si hay `immersive-ar`, se prefiere MR: maqueta 1:20, busca mesa por hit-test, gatillo coloca. Si no hay hit-test, queda delante del usuario. MR es inspección visual, no un vuelo a escala: termina la misión en pantalla. Si solo hay VR, ofrece vuelo inmersivo: palanca izquierda mueve, derecha cambia altura/giro, gatillo fotografía y A aterriza. Sal de XR para ver el análisis y escoger veredicto. Si no hay XR, sigue el modo normal.
+## XR y publicación
+El botón WebXR conserva una inspección visual experimental en gafas; MR coloca la maqueta sobre una mesa mediante hit-test. El flujo de inspección/decisión se realiza en escritorio. No se probó físicamente en Quest.
 
-Pendiente validar en gafas: permisos, escala/mesa/passthrough, mandos, fotografías inmersivas y comodidad. Las fotos XR pueden depender del compositor del navegador; escritorio es la ruta recomendada para evaluación completa. No se garantiza compatibilidad sin pruebas en dispositivo. Salir de XR vuelve a base sin borrar las fotos.
-
-## Desarrollo
-Aplicación estática de ES modules: servir esta carpeta por HTTP para desarrollo. Three.js 0.186.1 incluido con licencia MIT en vendor. Sin compilación ni dependencias remotas en ejecución. Cada etapa tiene su commit y push; Pages necesita la activación anterior antes de desplegar.
+GitHub Actions publica esta carpeta en la misma URL, desde `arena/c1eed267-dse` o `main`, y comprueba las pruebas unitarias antes de desplegar. No se modificó el dominio ni se requiere cambiar Settings. Para desarrollo y detalles de pruebas, consulta [VALIDACION.md](VALIDACION.md).
