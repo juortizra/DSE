@@ -25,6 +25,7 @@ export function createXR(T, renderer, flight, droneCamera, api) {
     unitTexture = null,
     hadController = false,
     lastFocus = true;
+  let lastCrash = false;
   let fpvCamera = null;
   let floorSpace = null,
     floorPlaced = false;
@@ -105,6 +106,7 @@ export function createXR(T, renderer, flight, droneCamera, api) {
     lastHUD = lastVideo = -Infinity;
     hadController = false;
     lastFocus = true;
+    lastCrash = false;
     owned.splice(0).forEach((o) => o.dispose());
     owned = [];
     pressed.clear();
@@ -337,6 +339,10 @@ export function createXR(T, renderer, flight, droneCamera, api) {
   function frame(dt, frame) {
     if (!session) return false;
     elapsed += dt;
+    const crashed = api.crashed();
+    if (crashed && !lastCrash && immersive) flash = 1;
+    lastCrash = crashed;
+    flash = Math.max(0, flash - dt * 0.5);
     if (floorSpace && !floorPlaced && frame?.getPose) {
       const pose = frame.getPose(floorSpace, renderer.xr.getReferenceSpace());
       if (pose) {
@@ -510,8 +516,7 @@ export function createXR(T, renderer, flight, droneCamera, api) {
         0.85,
         Math.abs(input.yaw) + Math.abs(input.x) * 0.4 + 0.3,
       );
-      if (api.crashed()) flash = 1;
-      flash = Math.max(0, flash - dt * 0.5);
+
       mask.material.uniforms.black.value = flash;
       try {
         renderer.render(flight, view);
@@ -522,7 +527,16 @@ export function createXR(T, renderer, flight, droneCamera, api) {
     } else {
       view.position.set(0, 0, 0);
       view.quaternion.identity();
-      renderer.render(root, view);
+      if (flash > 0) {
+        mask.material.uniforms.amount.value = 0;
+        mask.material.uniforms.black.value = flash;
+        root.add(mask);
+      }
+      try {
+        renderer.render(root, view);
+      } finally {
+        mask.removeFromParent();
+      }
     }
     return true;
   }

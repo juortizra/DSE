@@ -127,6 +127,9 @@ const { chromium } = require("playwright"),
       let current,
         rt = null,
         fail = false,
+        flying = true,
+        crashed = false,
+        blackSeen = false,
         inputs = [],
         focus = [],
         resources = 0;
@@ -166,7 +169,13 @@ const { chromium } = require("playwright"),
         },
         getRenderTarget: () => rt,
         setRenderTarget: (t) => (rt = t),
-        render() {
+        render(renderScene) {
+          if (
+            renderScene.children.some(
+              (o) => o.material?.uniforms?.black?.value > 0.8,
+            )
+          )
+            blackSeen = true;
           if (fail) throw Error("render de prueba");
         },
       };
@@ -188,11 +197,11 @@ const { chromium } = require("playwright"),
         photo() {},
         home() {},
         awaitingSD: () => false,
-        flying: () => true,
+        flying: () => flying,
         review: () => null,
         confirm() {},
         insert() {},
-        crashed: () => false,
+        crashed: () => crashed,
         hud: () => ["Prueba"],
       };
       const x = createXR(T, r, scene, cam, api);
@@ -208,6 +217,18 @@ const { chromium } = require("playwright"),
         current.dispatchEvent(new Event("visibilitychange"));
         x.frame(0.1, {});
         if (focus.at(-1) !== true) throw Error("Recuperación");
+        x.setImmersive(true);
+        flying = false;
+        crashed = true;
+        blackSeen = false;
+        x.frame(0.1, {});
+        if (!blackSeen) throw Error("Fundido ausente tras choque");
+        blackSeen = false;
+        x.frame(3, {});
+        if (blackSeen) throw Error("Fundido no termina");
+        flying = true;
+        crashed = false;
+        x.setImmersive(false);
         fail = true;
         let restored = false;
         try {
