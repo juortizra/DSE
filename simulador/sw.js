@@ -1,10 +1,10 @@
-const CACHE = "dse-2b-v1";
+const CACHE = "dse-2c-v1";
 const FILES = [
   "./",
   "./index.html",
   "./style.css",
   "./app.js",
-  "./world.js", "./config.js", "./sensors.js", "./measurement.js",
+  "./world.js", "./config.js", "./sensors.js", "./measurement.js", "./detector.js",
   "./quality.js",
   "./rules.js",
   "./vendor/three.module.js",

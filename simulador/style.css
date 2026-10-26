@@ -474,3 +474,4 @@ footer {
 .analysis h1 {
   font-size: 44px;
 }
+#tft{display:block;width:640px;max-width:100%;image-rendering:pixelated;border:16px solid #253333;border-radius:12px;box-shadow:0 12px 24px #0005}.detected-photo{position:relative}.detected-photo img{display:block;width:100%}.detection{position:absolute;border:1px solid #c4f37a;pointer-events:none}.detection span{position:absolute;top:-20px;left:0;background:#10232ae8;font:10px monospace;white-space:nowrap}.coverage{display:inline-block;padding:8px;margin:4px;background:#172f34}

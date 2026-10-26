@@ -1,3 +1,4 @@
+import {SimulatedDetector} from "./detector.js";
 import {measureCrack,oraclePixels} from "./measurement.js";
 import {CONFIG as C,VFOV} from "./config.js";
 import {samplePacket,batteryDrain} from "./sensors.js";
@@ -62,7 +63,7 @@ let world,
   returning = false,
   finishReason = "",
   xrMode = null;
-let calibrated=false,flightSeconds=0,sortie=1,flightToken=0,capturing=false,difficultyKey="normal";const truth=new Map(),batteryWarnings=new Set();const difficulty=()=>C.difficulties[difficultyKey];
+let calibrated=false,flightSeconds=0,sortie=1,flightToken=0,capturing=false,difficultyKey="normal";const truth=new Map(),batteryWarnings=new Set();let groundResults=[],processingToken=0;const detector=new SimulatedDetector();const difficulty=()=>C.difficulties[difficultyKey];
 const velocity = new T.Vector3(),
   keys = {},
   ray = new T.Raycaster(),
@@ -109,8 +110,8 @@ function build(l) {
   sun.intensity = 2.8 * environment.light;
   renderer.shadowMap.needsUpdate = true;
 }
-function menu() {
-  $("#status").textContent = "INSPECCIÓN POSTSISMO · 2B";
+function menu() {processingToken++;
+  $("#status").textContent = "INSPECCIÓN POSTSISMO · 2C";
   active = false;
   paused = false;
   document.exitPointerLock?.();
@@ -596,25 +597,21 @@ function finish(reason) {
   $("#hud").hidden = true;
   analyze();
 }
-function analyze() {
-  const c = cases[level],
-    complete = accepted() === points.length;
-  $("#panel").hidden = false;
-  $("#panel").className = "analysis";
-  window.scrollTo(0, 0);
-  $("#panel").innerHTML =
-    `<div class="eyebrow">UNIDAD DE TIERRA / RASPBERRY PI SIMULADA</div><h1>De la imagen<br><em>a la evidencia.</em></h1><p>${finishReason}</p><p>SD: ${photos.length} imágenes reales · ${accepted()}/${points.length} puntos documentados. ${complete ? "Inspección completa." : "<b>Inspección incompleta: no se puede autorizar el uso con estos datos.</b>"}</p><div class="photo-grid">${photos.map((p, i) => photoCard(p, i, true)).join("") || "<p>No se capturaron fotos.</p>"}</div><p class="note">Detección sintética sobre daños conocidos, no IA real. Cámara 1280 × 720, HFOV 82° [VERIFICAR]. Margen didáctico, no calibración. Los anchos por sí solos no determinan seguridad.</p><h2>Sugerencia del agente: ${complete ? cases[suggest(c)].label : "Datos insuficientes"}</h2><p>Decide tu clasificación preliminar (ejercicio educativo):</p><div class="choices">${cases.map((v, i) => `<button data-verdict="${i}" ${complete ? "" : "disabled"}>${v.label}</button>`).join("")}</div><div id="result"></div><button id="again">Volver a misiones</button>`;
-  $("#panel").onclick = (e) => {
-    if (e.target.closest("#again")) {
-      menu();
-      return;
-    }
-    const b = e.target.closest("[data-verdict]");
-    if (!b || !complete) return;
-    $("#result").innerHTML =
-      `<h2>${+b.dataset.verdict === level ? "Coincide con el escenario" : "Revisa tu decisión"}: ${c.label}</h2><p>${c.use}. ${c.explanation}</p><p>Anchos reales sintéticos: ${points.map((p) => p.width.toFixed(1) + " mm").join(" · ")}.</p><p>Herramienta de triage: prioriza al evaluador certificado; no certifica habitabilidad.</p>`;
-  };
+async function analyze(){
+ const token=++processingToken;groundResults=[];$('#panel').hidden=false;$('#panel').className='analysis';window.scrollTo(0,0);
+ $('#panel').innerHTML=`<div class="eyebrow">RASPBERRY PI ZERO 2 W / SD EN TIERRA</div><h1>Unidad de tierra</h1><p>${finishReason}</p><p>Simulación del modelo de IA liviano del proyecto. No es inferencia de IA real ni un benchmark de la Raspberry Pi.</p><canvas id="tft" width="${C.ground.width}" height="${C.ground.height}"></canvas><p id="queueState">Cargando SD…</p><div id="coverage"></div><div id="processed" class="photo-grid"></div><div id="groundSummary"></div>`;
+ for(let i=0;i<photos.length;i++){
+  if(token!==processingToken)return;drawTFT(i,photos.length,photos[i]);$('#queueState').textContent=`Procesando foto ${i+1}/${photos.length}…`;
+  await new Promise(r=>setTimeout(r,C.ground.minProcessMs+Math.random()*(C.ground.maxProcessMs-C.ground.minProcessMs)));if(token!==processingToken)return;
+  const result=await detector.detect(photos[i],truth.get(photos[i].id),C.scenarios[level]);groundResults.push(result);
+  const element=document.createElement('div');element.innerHTML=detectedCard(photos[i],result,i);$('#processed').append(element);drawCoverage();
+ }
+ if(token!==processingToken)return;$('#queueState').textContent='Cola terminada. SD leída sin transmitir durante el vuelo.';drawTFT(photos.length,photos.length);renderGroundSummary();
 }
+function detectedCard(p,r,i){const boxes=r.detections.map(d=>`<div class="detection" style="left:${d.box.x*100}%;top:${d.box.y*100}%;width:${d.box.w*100}%;height:${d.box.h*100}%"><span>${d.measure.measurable?d.measure.widthMm.toFixed(2)+' ± '+d.measure.uncertaintyMm.toFixed(2)+' mm':'No medible'}</span></div>`).join('');return `<article><div class="detected-photo"><img src="${p.image}" alt="Captura ${p.id}: ${p.name}">${boxes}</div><h3>${p.id}. ${p.name}</h3><p>Calidad ${p.quality.score}% · ${p.quality.accepted?'aceptada':'rechazada'}</p><p>${r.miss?'No se resolvió la grieta; posible falso negativo.':r.detections.map(d=>d.kind+': '+(d.measure.reason||d.measure.widthMm.toFixed(2)+' ± '+d.measure.uncertaintyMm.toFixed(2)+' mm')).join('<br>')}</p><p>${p.quality.reasons.join('<br>')}</p></article>`;}
+function drawTFT(done,total,p){const c=$('#tft');if(!c)return;const x=c.getContext('2d');x.fillStyle='#101c17';x.fillRect(0,0,c.width,c.height);x.font='13px monospace';x.fillStyle='#9ee2a0';x.fillText('PI ZERO 2 W / TFT 320x240',10,22);x.fillText('SD local · sin enlace de vuelo',10,45);x.fillText(`Cola ${done}/${total}`,10,72);x.strokeStyle='#9ee2a0';x.strokeRect(10,90,300,16);x.fillRect(10,90,total?300*done/total:300,16);x.fillText(p?'Foto '+p.id+': procesando':'Procesamiento terminado',10,135);x.fillText('IA LIVIANA: SIMULACIÓN',10,170);x.fillText('Revisar cobertura y reglas',10,204);}
+function drawCoverage(){const seen=new Set(groundResults.filter(r=>r.quality>=C.quality.accepted).map(r=>r.point));$('#coverage').innerHTML='<h3>Cobertura de checkpoints</h3>'+points.map((p,i)=>`<span class="coverage ${seen.has(i)?'good':'bad'}">${i+1}: ${seen.has(i)?'foto de calidad':'pendiente / insuficiente'}</span>`).join('');}
+function renderGroundSummary(){const complete=accepted()===points.length;$('#groundSummary').innerHTML=`<h2>${complete?'Procesamiento terminado':'Cobertura incompleta'}</h2><p>Estimaciones con mínimo ${C.measurement.minPixels} píxeles y error propagado. No detectar no demuestra ausencia de grietas.</p><button id="again">Volver a misiones</button>`;$('#again').onclick=menu;}
 document.addEventListener("click", (e) => {
   const img = e.target.closest(".photo-grid img");
   if (!img) return;
