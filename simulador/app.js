@@ -1,3 +1,4 @@
+import {measureCrack,oraclePixels} from "./measurement.js";
 import {CONFIG as C,VFOV} from "./config.js";
 import {samplePacket,batteryDrain} from "./sensors.js";
 import * as T from "./vendor/three.module.js";
@@ -109,7 +110,7 @@ function build(l) {
   renderer.shadowMap.needsUpdate = true;
 }
 function menu() {
-  $("#status").textContent = "INSPECCIÓN POSTSISMO · 2A";
+  $("#status").textContent = "INSPECCIÓN POSTSISMO · 2B";
   active = false;
   paused = false;
   document.exitPointerLock?.();
@@ -517,6 +518,7 @@ async function capture() {
  if(!active||paused||token!==flightToken){capturing=false;return;}
  // Todas las lecturas y la pose se congelan EN EL INSTANTE DE EXPOSICIÓN, no al pulsar F.
  const p=point(),q=quality(),timeMs=Date.now(),packet=readSensors(timeMs),id=photos.length+1;
+ packet.imu.wallAngleDeg=T.MathUtils.clamp(q.angle+(packet.imu.yawDeg-T.MathUtils.radToDeg(yaw))+(packet.imu.pitchDeg-T.MathUtils.radToDeg(pitch+tilt)),0,85);
  const image=snapshot();
  const record={id,timeMs,image,sensors:packet,quality:{score:q.score,accepted:q.accepted,reasons:q.reasons},distance:packet.laser.valid?packet.laser.mm/1000:Infinity,tilt:packet.imu.pitchDeg,name:p.name,point:chosen,inside:p.inside,time:new Date(timeMs).toLocaleTimeString('es-CO'),sortie};
  truth.set(id,{timeMs,point:chosen,distanceMm:q.distance*1000,angleDeg:q.angle,widthMm:p.width,pitchDeg:T.MathUtils.radToDeg(pitch+tilt),rollDeg:T.MathUtils.radToDeg(bank),position:rig.position.toArray()});
@@ -527,8 +529,8 @@ async function capture() {
  toast(q.accepted?`Foto ${id} guardada en SD · calidad local ${q.score}%.`:`Foto ${id} guardada (${q.score}%): ${q.reasons.join(' ')}`);updateHUD();
 }
 function photoCard(p, i, analysis = false) {
-  const e = {detected:false};
-  return `<article><img src="${p.image}" alt="Foto real ${i + 1}: ${p.name}" loading="lazy"><h3>${i + 1}. ${p.name}</h3><p class="${p.quality.accepted ? "good" : "bad"}">${p.quality.accepted ? "ACEPTADA" : "RECHAZADA"} · calidad ${p.quality.score}%</p><p>${p.time} · láser ${Number.isFinite(p.distance) ? p.distance.toFixed(2) + " m" : "sin lectura"} · cabeceo ${(p.sensors.imu.pitchDeg).toFixed(1)}° · batería ${p.sensors.battery.percent.toFixed(0)}%<br>${p.quality.reasons.join("<br>") || "Encuadre, distancia y estabilidad correctos."}</p>${analysis && p.quality.accepted ? `<p>${e.detected ? `Traza sintética resoluble: ${e.estimated.toFixed(2)} ± ${e.error.toFixed(2)} mm` : "Fisura por debajo de la resolución óptica simulada. No detectar no significa ausencia de daño."}</p>` : ""}</article>`;
+  const gt=truth.get(p.id);const e=analysis&&gt?measureCrack({pixels:oraclePixels(gt),laser:p.sensors.laser,angleDeg:p.sensors.imu.wallAngleDeg}):{measurable:false};
+  return `<article><img src="${p.image}" alt="Foto real ${i + 1}: ${p.name}" loading="lazy"><h3>${i + 1}. ${p.name}</h3><p class="${p.quality.accepted ? "good" : "bad"}">${p.quality.accepted ? "ACEPTADA" : "RECHAZADA"} · calidad ${p.quality.score}%</p><p>${p.time} · láser ${Number.isFinite(p.distance) ? p.distance.toFixed(2) + " m" : "sin lectura"} · cabeceo ${(p.sensors.imu.pitchDeg).toFixed(1)}° · batería ${p.sensors.battery.percent.toFixed(0)}%<br>${p.quality.reasons.join("<br>") || "Encuadre, distancia y estabilidad correctos."}</p>${analysis && p.quality.accepted ? `<p>${e.measurable ? `Ancho simulado: ${e.widthMm.toFixed(2)} ± ${e.uncertaintyMm.toFixed(2)} mm` : (e.reason||"No medible")}</p>` : ""}</article>`;
 }
 let galleryWasPaused = false;
 function gallery() {if(active){toast("SD no consultable durante el vuelo: sin enlace de datos. Revisa las imágenes en tierra.");return;}
@@ -601,7 +603,7 @@ function analyze() {
   $("#panel").className = "analysis";
   window.scrollTo(0, 0);
   $("#panel").innerHTML =
-    `<div class="eyebrow">UNIDAD DE TIERRA / RASPBERRY PI SIMULADA</div><h1>De la imagen<br><em>a la evidencia.</em></h1><p>${finishReason}</p><p>SD: ${photos.length} imágenes reales · ${accepted()}/${points.length} puntos documentados. ${complete ? "Inspección completa." : "<b>Inspección incompleta: no se puede autorizar el uso con estos datos.</b>"}</p><div class="photo-grid">${photos.map((p, i) => photoCard(p, i, true)).join("") || "<p>No se capturaron fotos.</p>"}</div><p class="note">Detección sintética sobre daños conocidos, no IA real. Cámara renderizada 1920 × 1080, FOV horizontal derivado de FOV vertical 65°. Margen didáctico, no calibración. Los anchos por sí solos no determinan seguridad.</p><h2>Sugerencia del agente: ${complete ? cases[suggest(c)].label : "Datos insuficientes"}</h2><p>Decide tu clasificación preliminar (ejercicio educativo):</p><div class="choices">${cases.map((v, i) => `<button data-verdict="${i}" ${complete ? "" : "disabled"}>${v.label}</button>`).join("")}</div><div id="result"></div><button id="again">Volver a misiones</button>`;
+    `<div class="eyebrow">UNIDAD DE TIERRA / RASPBERRY PI SIMULADA</div><h1>De la imagen<br><em>a la evidencia.</em></h1><p>${finishReason}</p><p>SD: ${photos.length} imágenes reales · ${accepted()}/${points.length} puntos documentados. ${complete ? "Inspección completa." : "<b>Inspección incompleta: no se puede autorizar el uso con estos datos.</b>"}</p><div class="photo-grid">${photos.map((p, i) => photoCard(p, i, true)).join("") || "<p>No se capturaron fotos.</p>"}</div><p class="note">Detección sintética sobre daños conocidos, no IA real. Cámara 1280 × 720, HFOV 82° [VERIFICAR]. Margen didáctico, no calibración. Los anchos por sí solos no determinan seguridad.</p><h2>Sugerencia del agente: ${complete ? cases[suggest(c)].label : "Datos insuficientes"}</h2><p>Decide tu clasificación preliminar (ejercicio educativo):</p><div class="choices">${cases.map((v, i) => `<button data-verdict="${i}" ${complete ? "" : "disabled"}>${v.label}</button>`).join("")}</div><div id="result"></div><button id="again">Volver a misiones</button>`;
   $("#panel").onclick = (e) => {
     if (e.target.closest("#again")) {
       menu();
