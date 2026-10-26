@@ -4,13 +4,14 @@
 - 1A: commit `45b787e`, run `40261167097`, correcto.
 - 1B: commits `b28649c` / `cd6ec31`, runs `40261548223` / `40261554980`, correctos.
 - 1C: commit `cf62e7d`, run `40262258205`, correcto.
-- 1D: el commit de entrega activa el mismo workflow; resultado verificable en Actions.
+- 1D: commit `ef08c64`, run `40262819604`, correcto; incluye pruebas unitarias antes de desplegar.
 
 ## Pruebas realizadas
 - Chromium headless con renderizado WebGL por software: tres recorridos menú → briefing → vuelo → 7 capturas aceptadas → galería → aterrizaje → análisis → decisión correcta. Se conservó también una foto rechazada por nivel y se comprobó el intervalo mínimo. Cero excepciones JavaScript observadas.
 - El test de recorrido sitúa el dron frente a cada punto para comprobar captura y flujo; **no equivale a pilotar manualmente todo el recorrido**.
 - Prueba separada de interiores: entrada mediante el integrador de vuelo y colisiones en los tres edificios; nueve posiciones de una ruta hasta el piso 2 comprobadas contra colisionadores mediante pequeños incrementos; oscuridad rechazada, luz aceptada y choque fuerte que finaliza la misión.
 - Prueba de vuelo: inclinación en avance y mantenimiento de altura. Pruebas unitarias de calidad: distancia excesiva/insuficiente, ángulo, velocidad, oscuridad, encuadre, oclusión, láser y roce. Pruebas ópticas y de prioridad de reglas.
+- Prueba offline con service worker real: carga completa, recarga, desconexión de red, menú → briefing → vuelo. Correcto y sin errores de consola.
 - La página pública se pudo leer con la herramienta externa de consulta. El navegador de pruebas local no puede conectar directamente a github.io debido a las restricciones de red del entorno: no se comprobó allí consola/renderizado del sitio remoto. Los despliegues sí se verificaron por GitHub Actions.
 
 ## Repetir pruebas (solo desarrollo)
