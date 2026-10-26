@@ -1,9 +1,11 @@
 # DSE
 
-Simulador educativo de inspección postsismo con dron, captura autónoma y análisis en tierra.
+**Simulador educativo:** https://juortizra.github.io/DSE/
 
-**Juego:** https://juortizra.github.io/DSE/
+Módulo autónomo en dron (cámara, láser, IMU, SD) y unidad de tierra simulada: captura, medición con incertidumbre, agente de triage, decisión e informe exportable.
 
-Consulta [controles y limitaciones](simulador/README.md) y [verificación](simulador/VALIDACION.md).
+- [Controles y alcance](simulador/README.md)
+- [Valores a verificar en hardware](simulador/VERIFICAR.md)
+- [Pruebas y limitaciones](simulador/VALIDACION.md)
 
 Simulación educativa. La clasificación oficial la hace el evaluador certificado.
