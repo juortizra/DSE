@@ -1,3 +1,4 @@
+import {evaluateAgent,LABELS,DISCLAIMER} from "./agent.js";
 import {SimulatedDetector} from "./detector.js";
 import {measureCrack,oraclePixels} from "./measurement.js";
 import {CONFIG as C,VFOV} from "./config.js";
@@ -63,7 +64,7 @@ let world,
   returning = false,
   finishReason = "",
   xrMode = null;
-let calibrated=false,flightSeconds=0,sortie=1,flightToken=0,capturing=false,difficultyKey="normal";const truth=new Map(),batteryWarnings=new Set();let groundResults=[],processingToken=0;const detector=new SimulatedDetector();const difficulty=()=>C.difficulties[difficultyKey];
+let calibrated=false,flightSeconds=0,sortie=1,flightToken=0,capturing=false,difficultyKey="normal";const truth=new Map(),batteryWarnings=new Set();let groundResults=[],processingToken=0,resumeSortie=false,agentResult=null;const detector=new SimulatedDetector();const difficulty=()=>C.difficulties[difficultyKey];
 const velocity = new T.Vector3(),
   keys = {},
   ray = new T.Raycaster(),
@@ -111,7 +112,7 @@ function build(l) {
   renderer.shadowMap.needsUpdate = true;
 }
 function menu() {processingToken++;
-  $("#status").textContent = "INSPECCIÓN POSTSISMO · 2C";
+  $("#status").textContent = "INSPECCIÓN POSTSISMO · 2D";
   active = false;
   paused = false;
   document.exitPointerLock?.();
@@ -125,7 +126,7 @@ function menu() {processingToken++;
     if (b) briefing(+b.dataset.level);
   };
 }
-function briefing(l) {
+function briefing(l) {resumeSortie=false;photos=[];truth.clear();
   level = l;
   build(l);
   rig.position.set(17, 12, 23);
@@ -151,7 +152,7 @@ function start(l) {
   camera.rotation.set(0, 0, 0);
   yaw = pitch = bank = tilt = 0;
   velocity.set(0, 0, 0);
-  photos = [];truth.clear();sortie=1;flightSeconds=0;flightToken++;sensorCache=null;
+  if(!resumeSortie){photos=[];truth.clear();sortie=1;}else {sortie++;for(const p of photos.filter(p=>p.quality.accepted)){if(points[p.point]){points[p.point].best=p;points[p.point].state='aceptada';}}}resumeSortie=false;flightSeconds=0;flightToken++;sensorCache=null;
   chosen = 0;
   lastShot = -Infinity;
   lastImpact = -Infinity;
@@ -512,7 +513,7 @@ function snapshot() {
 }
 async function capture() {
  if(!active||paused||xrMode) return;
- if(photos.length>=C.sd.capacity){toast('SD llena: regresa a base.');return;}
+ if(photos.filter(p=>p.sortie===sortie).length>=C.sd.capacity){toast('SD llena: regresa a base.');return;}
  if(capturing||performance.now()-lastShot<1000){toast('Espera al obturador y al intervalo entre fotos.');return;}
  capturing=true;const token=flightToken;toast('Obturador…');
  await new Promise(r=>setTimeout(r,C.camera.shutterMs));
@@ -611,7 +612,7 @@ async function analyze(){
 function detectedCard(p,r,i){const boxes=r.detections.map(d=>`<div class="detection" style="left:${d.box.x*100}%;top:${d.box.y*100}%;width:${d.box.w*100}%;height:${d.box.h*100}%"><span>${d.measure.measurable?d.measure.widthMm.toFixed(2)+' ± '+d.measure.uncertaintyMm.toFixed(2)+' mm':'No medible'}</span></div>`).join('');return `<article><div class="detected-photo"><img src="${p.image}" alt="Captura ${p.id}: ${p.name}">${boxes}</div><h3>${p.id}. ${p.name}</h3><p>Calidad ${p.quality.score}% · ${p.quality.accepted?'aceptada':'rechazada'}</p><p>${r.miss?'No se resolvió la grieta; posible falso negativo.':r.detections.map(d=>d.kind+': '+(d.measure.reason||d.measure.widthMm.toFixed(2)+' ± '+d.measure.uncertaintyMm.toFixed(2)+' mm')).join('<br>')}</p><p>${p.quality.reasons.join('<br>')}</p></article>`;}
 function drawTFT(done,total,p){const c=$('#tft');if(!c)return;const x=c.getContext('2d');x.fillStyle='#101c17';x.fillRect(0,0,c.width,c.height);x.font='13px monospace';x.fillStyle='#9ee2a0';x.fillText('PI ZERO 2 W / TFT 320x240',10,22);x.fillText('SD local · sin enlace de vuelo',10,45);x.fillText(`Cola ${done}/${total}`,10,72);x.strokeStyle='#9ee2a0';x.strokeRect(10,90,300,16);x.fillRect(10,90,total?300*done/total:300,16);x.fillText(p?'Foto '+p.id+': procesando':'Procesamiento terminado',10,135);x.fillText('IA LIVIANA: SIMULACIÓN',10,170);x.fillText('Revisar cobertura y reglas',10,204);}
 function drawCoverage(){const seen=new Set(groundResults.filter(r=>r.quality>=C.quality.accepted).map(r=>r.point));$('#coverage').innerHTML='<h3>Cobertura de checkpoints</h3>'+points.map((p,i)=>`<span class="coverage ${seen.has(i)?'good':'bad'}">${i+1}: ${seen.has(i)?'foto de calidad':'pendiente / insuficiente'}</span>`).join('');}
-function renderGroundSummary(){const complete=accepted()===points.length;$('#groundSummary').innerHTML=`<h2>${complete?'Procesamiento terminado':'Cobertura incompleta'}</h2><p>Estimaciones con mínimo ${C.measurement.minPixels} píxeles y error propagado. No detectar no demuestra ausencia de grietas.</p><button id="again">Volver a misiones</button>`;$('#again').onclick=menu;}
+function renderGroundSummary(){agentResult=evaluateAgent({required:points.map((p,i)=>i),results:groundResults});const a=agentResult;$('#groundSummary').innerHTML=`<h2>Sugerencia: ${a.label}</h2><p>${DISCLAIMER}</p><p>${a.referral}</p><p>Confianza de cobertura/calidad ${(a.confidence*100).toFixed(0)}% (no probabilidad de seguridad).</p><ul>${a.rules.map(r=>`<li>${LABELS[r.level]} · ${r.text}</li>`).join('')}</ul>${a.missing.length?'<h3>Qué falta</h3><ul>'+a.missing.map(t=>'<li>'+t+'</li>').join('')+'</ul><button id="secondSortie">Segunda salida · batería nueva y conservar fotos</button>':''}<h3>No evaluable con este sistema</h3><ul>${a.notEvaluable.map(t=>'<li>'+t+'</li>').join('')}</ul><div class="choices">${LABELS.map((v,i)=>`<button data-verdict="${i}" ${a.verdict===null?'disabled':''}>${v}</button>`).join('')}</div><div id="result"></div><button id="again">Volver a misiones</button>`;$('#again').onclick=menu;$('#secondSortie')?.addEventListener('click',()=>{resumeSortie=true;preflight(level);});$('#groundSummary').onclick=e=>{const b=e.target.closest('[data-verdict]');if(b&&a.verdict!==null)$('#result').innerHTML=`<h3>${+b.dataset.verdict===C.scenarios[level].expected?'Coincide con el escenario':'Revisar decisión'}</h3><p>${DISCLAIMER}</p>`;};}
 document.addEventListener("click", (e) => {
   const img = e.target.closest(".photo-grid img");
   if (!img) return;
@@ -778,4 +779,4 @@ if ("serviceWorker" in navigator)
     .catch(() => {});
 
 function degradePhoto(out){const c=out.getContext('2d'),img=c.getImageData(0,0,out.width,out.height),gain=1+(Math.random()*2-1)*C.camera.exposureVariation;for(let i=0;i<img.data.length;i+=4){const noise=(Math.random()*2-1)*C.camera.noiseAmplitude;for(let j=0;j<3;j++)img.data[i+j]=Math.max(0,Math.min(255,img.data[i+j]*gain+noise));}c.putImageData(img,0,0);const blur=velocity.length()*C.camera.blurPxPerMps;if(blur>.1){const copy=document.createElement('canvas');copy.width=out.width;copy.height=out.height;copy.getContext('2d').drawImage(out,0,0);c.globalAlpha=.25;for(const sign of [-1,1])c.drawImage(copy,sign*blur,0);c.globalAlpha=1;}return out.toDataURL('image/jpeg',C.camera.jpegQuality);}
-function preflight(l){active=false;$('#panel').hidden=false;$('#panel').innerHTML=`<div class="eyebrow">PREVUELO / MPU6050 SIN MAGNETÓMETRO</div><h1>Base de calibración</h1><p>Dron quieto sobre H. Calibra durante ${C.imu.calibrationSeconds} s; sin calibración aumenta la deriva de yaw.</p><p><label><input id="checkBattery" type="checkbox"> Batería nueva / revisada</label></p><p><label><input id="checkSD" type="checkbox"> ${photos.length?'SD revisada; conservar fotos de esta misión':'SD vacía y lista'}</label></p><button id="calibrate">Calibrar quieto ${C.imu.calibrationSeconds} s</button><p id="calState">Sin calibrar</p><button id="takeoff">Despegar sin calibrar</button>`;calibrated=false;let calibrating=false;$('#calibrate').onclick=async()=>{if(calibrating)return;calibrating=true;$('#calibrate').disabled=true;for(let i=C.imu.calibrationSeconds;i>0;i--){$('#calState').textContent=`Quieto en base… ${i} s`;await new Promise(r=>setTimeout(r,1000));if(!$('#calState'))return;}calibrated=true;$('#calState').textContent='Calibración terminada. Cabeceo/alabeo fiables; yaw aún deriva.';$('#takeoff').textContent='Despegar calibrado';calibrating=false;};$('#takeoff').onclick=()=>{if(calibrating)return;if(!$('#checkBattery').checked||!$('#checkSD').checked){$('#calState').textContent='Completa batería y SD antes de despegar.';return;}start(l);};}
+function preflight(l){active=false;$('#panel').hidden=false;$('#panel').innerHTML=`<div class="eyebrow">PREVUELO / MPU6050 SIN MAGNETÓMETRO</div><h1>Base de calibración</h1><p>Dron quieto sobre H. Calibra durante ${C.imu.calibrationSeconds} s; sin calibración aumenta la deriva de yaw.</p><p><label><input id="checkBattery" type="checkbox"> Batería nueva / revisada</label></p><p><label><input id="checkSD" type="checkbox"> ${photos.length?'SD de vuelo vacía; fotos anteriores archivadas en tierra':'SD vacía y lista'}</label></p><button id="calibrate">Calibrar quieto ${C.imu.calibrationSeconds} s</button><p id="calState">Sin calibrar</p><button id="takeoff">Despegar sin calibrar</button>`;calibrated=false;let calibrating=false;$('#calibrate').onclick=async()=>{if(calibrating)return;calibrating=true;$('#calibrate').disabled=true;for(let i=C.imu.calibrationSeconds;i>0;i--){$('#calState').textContent=`Quieto en base… ${i} s`;await new Promise(r=>setTimeout(r,1000));if(!$('#calState'))return;}calibrated=true;$('#calState').textContent='Calibración terminada. Cabeceo/alabeo fiables; yaw aún deriva.';$('#takeoff').textContent='Despegar calibrado';calibrating=false;};$('#takeoff').onclick=()=>{if(calibrating)return;if(!$('#checkBattery').checked||!$('#checkSD').checked){$('#calState').textContent='Completa batería y SD antes de despegar.';return;}start(l);};}
