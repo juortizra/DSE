@@ -23,3 +23,6 @@ Fuente editable: **config.js**. Todos los valores siguientes son de diseño o ej
 | Escenarios | Edificios ficticios de 2/4/5 pisos, 3 m/piso; anchos reales de grietas e inclinación de escenario en configuración. No son mediciones de un edificio real. |
 
 Con la óptica indicada, escalas a 300/500/1000 mm: **0,40748 / 0,67913 / 1,35826 mm/px**. El mínimo de 2 px a 900 mm es **2,4449 mm**. Para 0,2 mm, el máximo teórico es aproximadamente **73,6 mm**: comprobar enfoque y seguridad antes de proponer esa aproximación real.
+
+## Política provisional ante fisuras no resolubles
+[VERIFICAR] La nueva política separa cobertura y precisión: una cota óptica conservadora puede apoyar el triage sin dar un ancho exacto. Confianza relativa por punto no medido: factor 0,7 configurable. Una cota que alcance el umbral de 1 mm eleva a amarillo por precaución; no se usa para inventar daño severo extendido. Esta inferencia depende del modelo sintético de detección y no garantiza que una IA real carezca de falsos negativos. Validar con el evaluador responsable antes de cualquier uso fuera de la simulación.

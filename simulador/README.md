@@ -9,7 +9,7 @@ Selecciona edificio y dificultad → briefing → **prevuelo** (batería/SD y ca
 - **Shift:** aproximación fina. **F:** dispara tras 150 ms; espera al menos 1 s entre fotos. **T:** luz. **P:** pausa. **B:** guía a base, no piloto automático. **L:** aterriza en H.
 - En vuelo solo hay video y HUD local; **G no consulta la SD**. Las fotos y detecciones se revisan **en tierra**.
 - Entra por ACCESO; el hueco para subir está al frente-derecha visto desde la calle. Choques fuertes terminan el vuelo y conservan la SD.
-- Se puede aterrizar incompleto. **INDETERMINADO** ofrece segunda salida con nueva batería/SD de vuelo, conservando el archivo previo de la misión en tierra. Recargar o abandonar borra la sesión.
+- Se puede aterrizar incompleto. **INDETERMINADO** por falta de fotos/lecturas ofrece segunda salida con nueva batería/SD de vuelo, conservando el archivo previo de la misión en tierra. Recargar o abandonar borra la sesión.
 
 ## Lectura del láser y repetición de fotos
 El HUD muestra **milímetros** y el motivo real si no hay retorno (rango, vidrio o sol). La guía al checkpoint usa el origen de la cámara, no el centro del dron. La calidad de cada foto usa exactamente la lectura guardada al exponer, no una lectura anterior del HUD.
@@ -28,7 +28,7 @@ Todos los parámetros funcionales se concentran en [`config.js`](config.js), con
 ## Unidad de tierra, agente e informe
 TFT lógica 320×240, cola de 0,5–2 s/foto **simulados**, cajas sobre regiones de inspección, cobertura y reglas activadas. `detector.js` expone un adaptador reemplazable: la implementación actual usa verdad de terreno y calidad, con falsos positivos/negativos; **no es un modelo de IA real ni un benchmark de Raspberry Pi**.
 
-El agente considera colapso, inclinación, daño localizado/extendido, amenazas e incertidumbre. La confianza resume cobertura/calidad, **no probabilidad de seguridad**. Si hay réplica opcional, se invalida la cobertura de fotos anteriores y se recuerda repetir la Fase 1.
+El agente considera colapso, inclinación, daño localizado/extendido, amenazas e incertidumbre. **Cobertura fotográfica no es lo mismo que medición de anchos:** ya no se exige medir numéricamente cada fisura para evaluar las demás evidencias. En una región de buena calidad con láser válido, una traza no resoluble aporta una cota óptica conservadora (no un ancho medido), incluyendo margen de píxeles, láser y ángulo. Si esa cota alcanza 1 mm, se aplica amarillo por precaución; solo se permite verde si todas las medidas/cotas permanecen por debajo y no hay otras alarmas. El colapso, la inclinación y las amenazas mantienen su prioridad. Sin cobertura o sin datos utilizables se conserva INDETERMINADO. Las limitaciones reducen la confianza y permiten una segunda salida opcional. Esta cota está condicionada al modelo sintético y no es una garantía de detección en hardware real. La confianza resume cobertura/calidad, **no probabilidad de seguridad**. Si hay réplica opcional, se invalida la cobertura de fotos anteriores y se recuerda repetir la Fase 1.
 
 La verdad de terreno solo se muestra al abrir el informe final/parcial. El ZIP contiene JPEG sintéticos, `telemetria.csv`, `verdad-terreno.json`, `informe.json`, `configuracion.json` y aviso `LEEME.txt`; no sube archivos a ningún servidor.
 

@@ -33,3 +33,11 @@
 - `npm run test:laser`: navegador con aleatoriedad real (sin sustituir Math.random), 7 puntos por nivel, múltiples lecturas por punto contrastadas con distancia de escena y error configurado; veredictos verde/amarillo/rojo después de fotos válidas. Los fallos solares genuinos se repiten, no se sustituyen por lecturas inventadas.
 - Regresión de caché inválida frente a lectura de exposición válida. Caso a 800 mm con láser válido pero capilar no resoluble: INDETERMINADO con explicación óptica y consejo, no “sensor roto”.
 - El arnés coloca el dron frente al objetivo y acelera la cola de tierra; no equivale a pilotaje manual ni valida hardware.
+
+## Corrección del bloqueo del agente por precisión óptica
+- Se detectó que cualquier checkpoint sin ancho medible añadía una carencia bloqueante y anulaba el resultado completo. Ahora se distinguen fotos/lecturas ausentes de limitaciones de medida con evidencia utilizable.
+- Cada resultado del detector contiene metadatos ópticos derivados exclusivamente del láser y la calibración. Las cotas no se presentan como anchos medidos y no consultan el color esperado del escenario.
+- Cota conservadora: `(mínimo de píxeles + error de segmentación) × mm/px`, usando la distancia más su error y el ángulo que maximiza la escala dentro del error estimado. Es condicional a una región bien encuadrada y al modelo sintético; no valida falsos negativos de una IA real.
+- 43 pruebas unitarias: incluye cobertura completa sin anchos, colapso/inclinación/amenazas con limitaciones, límites de cota, lecturas ausentes, baja calidad y repetición mejorada sin bloqueo por fotos anteriores.
+- `npm run test:evidence`, Chromium con ruido aleatorio activo: 7 fotos buenas a 0,8 m en cada edificio → amarillo por precaución / amarillo / rojo; 7 fotos a 0,2 m en vivienda → verde provisional por cotas suficientes; decisiones habilitadas y acceso al informe. Sin fotos → INDETERMINADO y segunda salida. Cero errores de consola observados.
+- El arnés sitúa el dron frente a los puntos y acelera la cola de procesamiento; no es un recorrido pilotado manualmente.
